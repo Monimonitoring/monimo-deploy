@@ -7,7 +7,7 @@ set -euo pipefail
 
 require_local_context
 
-step "4 관통 확인 (telemetrygen → 수집기 → Kafka → 적재 처리기 → ClickHouse)"
+step "4 E2E 확인 (telemetrygen → Collector → Kafka → Ingester → ClickHouse)"
 ch() {   # ClickHouse 파드 안에서 쿼리 한 줄. 계정은 파드 환경변수를 쓴다
   k -n data exec clickhouse-0 -- sh -c "clickhouse-client --user \"\$CLICKHOUSE_USER\" --password \"\$CLICKHOUSE_PASSWORD\" --query \"$1\""
 }
@@ -39,4 +39,4 @@ for t in spans metrics_raw logs; do
 done
 
 echo
-ok "로컬 쿠버네티스 수집 경로 관통 (agents 는 안 본다 : telemetrygen 서비스는 등록돼 있지 않다, backend #66)"
+ok "로컬 쿠버네티스 수집 경로 E2E 통과 (agents 는 안 본다 : telemetrygen 서비스는 등록돼 있지 않다, backend #66)"

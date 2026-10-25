@@ -47,7 +47,7 @@ k apply -k "$ROOT/overlays/local/2-jobs" > /dev/null
 for j in kafka-init postgres-migrate clickhouse-migrate; do wait_job data "$j"; done
 
 # ── 3
-step "3 수집기 · 적재 처리기"
+step "3 Collector · Ingester"
 k apply -k "$ROOT/overlays/local/3-apps" > /dev/null
 for d in collector ingester; do wait_rollout apm "deployment/$d"; done
 # readiness 가 이미 /readyz 를 봤지만, 완료 조건(업무 포트 /readyz 200)을 눈에 보이게 한 번 더 찌른다
