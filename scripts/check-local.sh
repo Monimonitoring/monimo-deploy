@@ -39,4 +39,4 @@ for t in spans metrics_raw logs; do
 done
 
 echo
-ok "로컬 쿠버네티스 수집 경로 E2E (agents 는 안 본다 : telemetrygen 서비스는 등록돼 있지 않다, backend #66)"
+ok "로컬 쿠버네티스 수집 경로 E2E 통과 (agents 는 안 본다 : telemetrygen 서비스는 등록돼 있지 않다, backend #66)"

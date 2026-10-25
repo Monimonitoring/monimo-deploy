@@ -64,7 +64,8 @@
 - 로컬 ArgoCD (`#20`, `docs/plan.md` 3단계). 공식 install.yaml `v3.5.5` 고정 · App of Apps(root manual · 자식 셋 automated, prune · selfHeal 끔) · sync wave · 준비 Job 셋은 `local-apps` 의 PreSync hook · 네임스페이스 `Prune=false` · Application 상태 판정(`argocd-cm`). 스크립트를 `local-prereqs.sh` · `check-local.sh` · `lib.sh` 로 나눠 `up-local.sh` 와 `up-argocd.sh` 가 같이 쓴다. 실측 · 연습 결과는 `docs/seungjo/20-local-argocd/research.md` 9절
 - 로컬 쿠버네티스에 수집 경로 (`#14`, `docs/plan.md` 1단계). 생 YAML + kustomize overlay · 저장소 셋 StatefulSet(공식 이미지) · 준비 Job 셋 · Collector · Ingester · `telemetrygen` E2E 확인을 `scripts/up-local.sh` 하나로. 이미지는 로컬 빌드 태그 + `IfNotPresent`. SQL · 인증서 · 비밀값은 레포 밖(스크립트가 넣는다). `overlays/eks/` 는 자리만. `docs/seungjo/14-local-k8s-collect/research.md`
 - 1b EKS 배포 기반 결정 (`#9`, backend ADR `#62`). 서울 · 데이터 온디맨드 t3.large 1대(한 AZ) + 앱 Spot t3.large 2대 · 정해진 시간만 켬(발표 전 상시) · NAT 인스턴스(fck-nat) · Traefik + NLB · 공식 이미지 StatefulSet + EBS(Retain) · External Secrets · CI 가 GitHub App 토큰으로 `image.tag` 커밋 · 관리형 노드 그룹 고정. 월 약 $167 ~ 220. `docs/seungjo/9-eks-foundation/`
-- 2026-10-26 문서 · 주석의 우리말 조어를 현업 이름으로 바꿨다 (backend `#240` · ADR `#73`). 코드 안 문자열(테스트 이름 · 스크립트 출력)은 backend `#241`
+- 2026-10-26 문서 · 주석의 우리말 조어를 현업 이름으로 바꿨다 (backend `#240` · ADR `#73`).
+- 2026-10-26 코드 안 문자열도 같은 이름으로 바꿨다 (backend `#241`) : 스크립트 출력(`step "3 Collector · Ingester"` · `4 E2E 확인`)
 
 ## 6. 지금 막혀 있는 것
 
