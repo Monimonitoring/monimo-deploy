@@ -1,4 +1,4 @@
-# 수집기. 상태가 없어 Deployment (파드 이름이 바뀌어도 된다). 환경변수는 backend compose.yaml 의 collector 를 옮기고 주소만 바꿨다
+# Collector. 상태가 없어 Deployment (파드 이름이 바뀌어도 된다). 환경변수는 backend compose.yaml 의 collector 를 옮기고 주소만 바꿨다
 # 포트 : 4317 OTLP gRPC · 8081 업무 HTTP(/livez · /readyz · 명령 문) · 18081 관리(/actuator/**, 업무 포트 + 10000, ADR #61)
 # readiness 는 업무 포트의 /readyz 이고 저장소를 안 본다 (ADR #58 : PG 가 죽어도 수집은 돈다)
 apiVersion: apps/v1

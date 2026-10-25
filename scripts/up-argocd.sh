@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 로컬 쿠버네티스(Docker Desktop)에 ArgoCD 를 띄우고 root Application 을 넣는다 (#20). kubectl 로 묶음을 넣는 up-local.sh 와 다른 길이다
+# 로컬 쿠버네티스(Docker Desktop)에 ArgoCD 를 띄우고 root Application 을 넣는다 (#20). kubectl 로 단계를 넣는 up-local.sh 와 다른 길이다
 #
 #   ./scripts/up-argocd.sh           레포 밖 준비물(local-prereqs.sh) → ArgoCD 설치 → root 넣기 → UI 들어가는 법 출력
 #   ./scripts/up-argocd.sh --down    지우기 (argocd · apm · data · shop 네임스페이스, PVC 도 같이 지워진다. CRD 같은 클러스터 단위 자원은 남는다)
 #
 # 순서는 이 스크립트가 아니라 sync wave 가 지킨다 (argocd/apps/local 의 번호표 0 → 3). 이 스크립트는 root 를 sync 하지 않는다 :
-# 로컬은 사람이 root 를 Sync 해서 시작한다 (manual). 끝나면 ./scripts/check-local.sh 로 관통을 본다
+# 로컬은 사람이 root 를 Sync 해서 시작한다 (manual). 끝나면 ./scripts/check-local.sh 로 E2E 를 본다
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 

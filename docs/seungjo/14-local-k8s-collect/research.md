@@ -1,10 +1,12 @@
 # `#14` 로컬 쿠버네티스에 수집 경로를 올린다
 
+> 용어만 glossary(`monimo-backend/docs/design/glossary.md`) 기준으로 바꿈 (`#240`) : 원문 인용도 용어만 바꾸고 문장은 그대로 뒀다
+
 이슈 `#14` · 2026-10-14 · 승조(`@SeungJo-02`)
 
 9단계 틀로 쓴다. 3 · 6 절은 승조 차례(질문과 선택)이고 8절은 구현 프롬프트다.
 
-> `#9` 가 EKS 의 **모양**을 정했고(리전 · 노드 · 네트워크 · 입구 · 데이터 · 비밀값 · 이미지 태그), `#184`(backend ADR `#66`)가 **순서와 인증서**를 정했다. 이번은 그 결정들을 **처음으로 파일로 옮기는** 일이다. 레포 폴더 일곱 개가 아직 전부 `.gitkeep` 만 있다.
+> `#9` 가 EKS 의 **모양**을 정했고(리전 · 노드 · 네트워크 · Ingress · 데이터 · 비밀값 · 이미지 태그), `#184`(backend ADR `#66`)가 **순서와 인증서**를 정했다. 이번은 그 결정들을 **처음으로 파일로 옮기는** 일이다. 레포 폴더 일곱 개가 아직 전부 `.gitkeep` 만 있다.
 
 ---
 
@@ -17,7 +19,7 @@
 | 이유 | 근거 |
 |---|---|
 | 일정이 그렇게 잡혀 있다 | `#9` README 「다음」 : 10/18~21 로컬 쿠버네티스, Terraform 첫 `apply` 는 10/22~23 |
-| **데모 비상 대책이다** | `AGENTS.md` §6 : EKS 가 끝내 안 되면 로컬 쿠버네티스로 데모를 찍는다 (10/24 까지 로컬 전체 관통) |
+| **데모 비상 대책이다** | `AGENTS.md` §6 : EKS 가 끝내 안 되면 로컬 쿠버네티스로 데모를 찍는다 (10/24 까지 로컬 전체 E2E) |
 | 매니페스트가 틀렸는지를 돈 안 들이고 안다 | EKS 는 고정비가 예산의 절반이라(`#9`) 켜 둔 채로 고치면 비싸다 |
 
 ### 지금 무엇이 없나
@@ -39,7 +41,7 @@
 | 무엇 | 어디서 |
 |---|---|
 | 순서 장치는 **손으로 시작**하고 배포 도구가 서면 훅으로 옮긴다. Job 정의는 compose 의 일회성 컨테이너 모양 그대로 둔다 | ADR `#66` ①② |
-| 인증서는 **두 묶음**(수집기용 · 쇼핑몰용). 금고에 두고 External Secrets 가 꺼내 파드에 **파일로** 건다. 요구 수준은 금고 밖 | ADR `#66` ③⑤, `#62` ⑦ |
+| 인증서는 **두 벌**(Collector 용 · 쇼핑몰용). Secrets Manager 에 두고 External Secrets 가 꺼내 파드에 **파일로** 건다. 요구 수준은 Secrets Manager 밖 | ADR `#66` ③⑤, `#62` ⑦ |
 | 저장소는 **공식 이미지 StatefulSet**, 볼륨은 `Retain` | ADR `#62` |
 | 관리 포트는 업무 포트 + 10000. `readiness` 는 저장소를 안 본다 | ADR `#58` |
 | ClickHouse PVC 출발값 **50 GB** | backend `20-scope.md` 「PVC 크기 근거」 |
@@ -70,14 +72,14 @@ collector · ingester
 | 자리 | 순서가 틀리면 |
 |---|---|
 | 표와 코드가 다름 (`ddl-auto: validate`, 다섯 모듈 전부) | **앱이 기동 실패**한다 |
-| 토픽 없음 (`KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"`) | 수집기는 뜨지만 **발행이 실패**한다. 에이전트에 `UNAVAILABLE` 로 돌려보내므로 유실은 아니고 수집이 안 되는 상태다 |
-| 요구 수준을 켠 뒤 인증서를 못 읽음 | **수집기가 기동 실패**한다 (ADR `#64` ⑨, 평문으로 대신 뜨지 않는다) |
+| 토픽 없음 (`KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"`) | Collector 는 뜨지만 **발행이 실패**한다. 에이전트에 `UNAVAILABLE` 로 돌려보내므로 유실은 아니고 수집이 안 되는 상태다 |
+| 요구 수준을 켠 뒤 인증서를 못 읽음 | **Collector 가 기동 실패**한다 (ADR `#64` ⑨, 평문으로 대신 뜨지 않는다) |
 
 쿠버네티스는 죽은 파드를 계속 다시 띄우니 **결국은 뜬다.** 장치의 값은 "결국 뜨는가" 가 아니라 ① 배포 성공을 착각하지 않는 것 ② 재시작 루프 동안 에이전트 버퍼를 낭비하지 않는 것 ③ 사람이 원인을 빨리 아는 것이다 (ADR `#66` 채택 사유).
 
 ### 2.2 저장소 셋과 앱 둘은 쿠버네티스에서 성질이 다르다
 
-| | 저장소 셋 (Kafka · ClickHouse · PostgreSQL) | 앱 둘 (수집기 · 적재 처리기) |
+| | 저장소 셋 (Kafka · ClickHouse · PostgreSQL) | 앱 둘 (Collector · Ingester) |
 |---|---|---|
 | 자원 | StatefulSet + PVC + Headless Service | Deployment + Service |
 | 이름 | `kafka-0` 처럼 번호가 붙고 재시작해도 같다 | 재시작하면 이름이 바뀐다 |
@@ -112,15 +114,15 @@ EKS 는 CI 가 ECR 에 올리고 봇이 `image.tag` 를 이 레포에 커밋한�
 
 도구 상태 : `kubectl v1.34.1` · `helm v4.2.0` 설치돼 있다. `kind` · `minikube` 는 없다. 컨텍스트 `docker-desktop` 은 있는데 **클러스터가 꺼져 있다**(`127.0.0.1:6443` 연결 거부). → 2026-10-17 에는 켜져 있다 : 노드 `docker-desktop` 하나 `Ready` · `v1.34.1`
 
-### 2.5 관통을 확인하려면 신호를 흘리는 쪽이 필요하다
+### 2.5 E2E 를 확인하려면 신호를 흘리는 쪽이 필요하다
 
-수집기 · 적재 처리기만 올리면 "떴다" 까지만 알 수 있다. compose 의 `check-pipeline.sh` 가 하는 일(신호를 넣고 ClickHouse 에서 센다)을 쿠버네티스에서도 해야 하는데, 넣는 쪽 후보가 셋이다
+Collector · Ingester 만 올리면 "떴다" 까지만 알 수 있다. compose 의 `check-pipeline.sh` 가 하는 일(신호를 넣고 ClickHouse 에서 센다)을 쿠버네티스에서도 해야 하는데, 넣는 쪽 후보가 셋이다
 
 | 넣는 쪽 | 무엇을 확인할 수 있나 | 비용 |
 |---|---|---|
-| 쇼핑몰 넷을 쿠버네티스에 같이 | **진짜 실데이터.** 파드 이름표 · mTLS · 서버맵까지 | 쇼핑몰 차트 · MySQL · Redis · 게이트웨이까지 올려야 한다 |
-| 쇼핑몰은 compose 에 두고 수집기만 쿠버네티스 | 실데이터이긴 하다 | compose 쪽에서 클러스터 안 4317 로 닿는 길을 열어야 한다(`NodePort` 등) |
-| `telemetrygen` Job | 경로가 뚫렸는지만 | 가장 싸다. 꼬리표 모양이 실데이터와 다르다(ADR `#65` ⑥) |
+| 쇼핑몰 넷을 쿠버네티스에 같이 | **진짜 실데이터.** 파드 이름표 · mTLS · Service map 까지 | 쇼핑몰 차트 · MySQL · Redis · 게이트웨이까지 올려야 한다 |
+| 쇼핑몰은 compose 에 두고 Collector 만 쿠버네티스 | 실데이터이긴 하다 | compose 쪽에서 클러스터 안 4317 로 닿는 길을 열어야 한다(`NodePort` 등) |
+| `telemetrygen` Job | 경로가 뚫렸는지만 | 가장 싸다. Attribute 모양이 실데이터와 다르다(ADR `#65` ⑥) |
 
 ### 출처
 
@@ -170,7 +172,7 @@ EKS 는 CI 가 ECR 에 올리고 봇이 `image.tag` 를 이 레포에 커밋한�
 | **ㄴ 처음부터 Helm 공통 차트 + values** | 레포 구조가 전제하는 끝 모양이다(2.4). 환경 차이(로컬 50 GB → 5 GB)를 values 로 가른다 | 처음 돌려 보기까지가 멀다. 템플릿이 틀렸을 때 원인이 한 겹 숨는다 |
 | **ㄷ Kustomize base + overlay** | 환경 차이를 패치로 가르고 템플릿 문법이 없다 | 레포가 Helm 을 적어 뒀고 Argo CD 설정도 Helm 전제다. 둘을 섞으면 주인이 둘이 된다 |
 
-고려 : ㄱ 과 ㄴ 은 배타가 아니다. "생 YAML 로 한 번 관통시키고, 같은 PR 안에서 차트로 접는다" 가 가능하다. 그때는 **관통 로그를 근거로 남기는 것**이 값이다.
+고려 : ㄱ 과 ㄴ 은 배타가 아니다. "생 YAML 로 한 번 끝까지 지나가게 하고, 같은 PR 안에서 차트로 접는다" 가 가능하다. 그때는 **E2E 로그를 근거로 남기는 것**이 값이다.
 
 ### 5.3 로컬에서 이미지 먹이기
 
@@ -180,7 +182,7 @@ EKS 는 CI 가 ECR 에 올리고 봇이 `image.tag` 를 이 레포에 커밋한�
 | **ㄴ 로컬 레지스트리(`localhost:5000`)를 띄운다** | EKS 와 흐름이 같다(올리고 당긴다). 태그 규칙을 그대로 시험한다 | 컨테이너 하나가 늘고 `insecure-registry` 설정이 붙는다 |
 | **ㄷ 바로 ECR 을 쓴다** | 흐름이 EKS 와 완전히 같다 | AWS 계정이 아직 없다(`AGENTS.md` §6). 10/17 준비물에 걸려 있어 **로컬 구간을 막는다** |
 
-### 5.4 신호를 흘리는 쪽 (관통 확인)
+### 5.4 신호를 흘리는 쪽 (E2E 확인)
 
 2.5 의 표가 그대로 선택지다. 섞을 수도 있다 : `telemetrygen` 으로 경로를 먼저 뚫고, 쇼핑몰은 10/23~24 「팀 API 연동분 차트」 구간에서 올린다.
 
@@ -217,14 +219,14 @@ ADR `#66` ① 이 "손으로 시작" 으로 정했으니 **자동 장치는 안 
   - 알고 쓰는 것 : `telemetrygen` 서비스 이름은 등록돼 있지 않아 `agents` 에는 안 들어간다(backend `#66`). 점검은 spans · metrics · logs 줄 수로 본다
   - 쇼핑몰을 올리는 것(①)은 이 이슈 밖으로 미룬다
 - **5.5 : ㄴ 셸 스크립트 하나** (2026-10-17, 승조 : 「kubectl 명령어를 readme로(이건 나중에 너무 귀찮을 거 같아서 pass) · 하나의 쉘 스크립트로 (이걸로)」)
-  - 묶음 셋을 `kubectl apply -k` 로 차례로 넣고, 사이에 `kubectl wait` 로 Ready · Job 성공을 기다린다. 제한 시간을 넘기면 그 자리에서 멈춘다
+  - 단계 셋을 `kubectl apply -k` 로 차례로 넣고, 사이에 `kubectl wait` 로 Ready · Job 성공을 기다린다. 제한 시간을 넘기면 그 자리에서 멈춘다
   - ADR `#66` ① 「손으로 시작」과 어긋나지 않는다 : 사람이 치는 한 줄을 묶었을 뿐 클러스터 안 장치가 아니다. 배포 도구(ArgoCD)가 서면 sync wave 로 옮기고 버린다
 - **5.6 : ㄱ 우리 YAML** (2026-10-17, 승조 : 「Yaml (이걸로) · 백업, 스케일링등 직접 해야하지만 지금은 한 대씩이라 가장 맞는 선택인듯」)
   - 공개 차트를 안 고른 이유 : kustomize 에 Helm 이 섞여 도구가 둘이 되고, 셋이 저마다 사용법이 다르고, Bitnami 가 무료 이미지 업데이트를 끊었다(ADR `#62` F)
   - 오퍼레이터를 안 고른 이유 : 1b 에 과하다
 - **7절 「구현 전에 짚을 것 둘」** (2026-10-17, 승조 : 「추천방향으로 진행」 · 선택지는 바탕화면 가이드 1-A · 1-B)
   - 마이그레이션 SQL : **스크립트가 backend `db/` 를 읽어 ConfigMap 으로 넣는다**. 레포에 SQL 이 안 남는다(`AGENTS.md` §2). EKS 는 5단계에서 CI 가 마이그레이션 이미지에 SQL 을 굽는 쪽으로 옮긴다
-  - 인증서 : **스크립트가 compose 와 같은 `monimo/otlp-certs:dev` 로 만들어 Secret 으로 넣는다**. 수집기는 Secret 을 `/certs` 파일로 건다 = EKS External Secrets 와 같은 모양. 그래서 준비 Job 은 넷이 아니라 **셋 + 인증서 단계**다
+  - 인증서 : **스크립트가 compose 와 같은 `monimo/otlp-certs:dev` 로 만들어 Secret 으로 넣는다**. Collector 는 Secret 을 `/certs` 파일로 건다 = EKS External Secrets 와 같은 모양. 그래서 준비 Job 은 넷이 아니라 **셋 + 인증서 단계**다
 
 ---
 
@@ -237,7 +239,7 @@ ADR `#66` ① 이 "손으로 시작" 으로 정했으니 **자동 장치는 안 
 | 5.1 로컬 클러스터 | Docker Desktop | `plan.md` 2026-10-16 |
 | 5.2 매니페스트 모양 | 생 YAML + kustomize overlay (`base` · `overlays/local` · `overlays/eks`) | `plan.md` 2026-10-16 |
 | 5.3 로컬 이미지 | 로컬 빌드 태그 + `imagePullPolicy: IfNotPresent` (명시) | `plan.md` 2026-10-16 · 2026-10-17 실측 |
-| 5.4 관통 확인 | `telemetrygen` Job + ClickHouse 줄 수 세기 | 승조 2026-10-17 |
+| 5.4 E2E 확인 | `telemetrygen` Job + ClickHouse 줄 수 세기 | 승조 2026-10-17 |
 | 5.5 순서 장치 | 셸 스크립트 하나 (`apply -k` 셋 + `kubectl wait`) | 승조 2026-10-17 |
 | 5.6 저장소 셋 | 우리 YAML (공식 이미지 StatefulSet + Headless Service + PVC) | 승조 2026-10-17 |
 
@@ -247,8 +249,8 @@ ADR `#66` ① 이 "손으로 시작" 으로 정했으니 **자동 장치는 안 
 0. 네임스페이스            apply → (기다릴 것 없음)
 1. 저장소 셋               apply → wait : 파드 셋 Ready
 2. 준비 Job 넷             apply → wait : Job 넷 complete
-3. 수집기 · 적재 처리기     apply → wait : 파드 둘 Ready
-4. 관통 확인               telemetrygen Job → ClickHouse spans · metrics · logs 줄 수가 늘었는가
+3. Collector · Ingester     apply → wait : 파드 둘 Ready
+4. E2E 확인               telemetrygen Job → ClickHouse spans · metrics · logs 줄 수가 늘었는가
 ```
 
 ### 구현 전에 짚을 것 둘 (compose 를 다시 읽다 찾았다, 아직 안 정함)
@@ -258,8 +260,8 @@ ADR `#66` ① 이 "손으로 시작" 으로 정했으니 **자동 장치는 안 
   - 쿠버네티스 파드는 backend 레포 폴더를 그대로 걸 수 없다. 그렇다고 이 레포에 SQL 을 복사하면 「스키마 파일은 1a 동안 여기 두지 않는다」(`AGENTS.md` §2)를 깬다
   - 후보 : ① 마이그레이션 이미지에 SQL 을 구워 넣는다(backend 쪽 Dockerfile 손질, EKS 에서도 그대로 쓴다) ② 로컬만 `hostPath` 로 backend 폴더를 건다(로컬 전용 길이 생긴다)
 - **인증서 Job(`otlp-certs`)의 결과를 어디에 두나**
-  - compose 는 내 컴퓨터 `./certs/` 에 쓰고 수집기가 그 폴더를 읽는다. 파드 안에 쓰면 Job 이 끝나는 순간 사라진다
-  - 수집기 TLS 기본값이 꺼짐(`none`)이라 로컬 관통에는 인증서가 필요 없다. 운영은 금고 + External Secrets 로 정해져 있다(ADR `#66` ③)
+  - compose 는 내 컴퓨터 `./certs/` 에 쓰고 Collector 가 그 폴더를 읽는다. 파드 안에 쓰면 Job 이 끝나는 순간 사라진다
+  - Collector TLS 기본값이 꺼짐(`none`)이라 로컬 E2E 에는 인증서가 필요 없다. 운영은 Secrets Manager + External Secrets 로 정해져 있다(ADR `#66` ③)
   - 후보 : ① 로컬에서는 이 Job 을 빼고 「Job 셋」으로 간다(완료 조건 「Job 넷」을 고친다) ② Job 이 결과를 Secret 으로 만든다(Job 에 Secret 쓰기 권한이 붙는다)
 
 ---
@@ -277,13 +279,13 @@ research.md 6절 7절에 정한 거 기준으로 하면 되고 정리하면 이�
 순서
 compose 는 depends_on 이 알아서 순서대로 올려 주는데
 K8s 는 컨트롤러들이 동시에 움직여서 순서 안 정하면 문제 생기니까
-묶음으로 나눠서 apply 하고 사이에 kubectl wait 로 먼저 넣은 게 준비될 때까지 (파드 Ready, Job 성공) 기다렸다가 다음 거 넣는 방식으로 해줘
+단계로 나눠서 apply 하고 사이에 kubectl wait 로 먼저 넣은 게 준비될 때까지 (파드 Ready, Job 성공) 기다렸다가 다음 거 넣는 방식으로 해줘
 apply 는 안 기다리고 바로 끝나니까 wait 꼭 넣고 제한 시간 넘으면 거기서 멈추게
 
 0 네임스페이스 (apm data shop)
 1 저장소 셋 (kafka clickhouse postgres) → Ready 까지 wait
 2 준비 Job 넷 (kafka-init postgres-migrate clickhouse-migrate otlp-certs) → 성공까지 wait
-3 수집기 적재 처리기 → Ready 까지 wait
+3 Collector Ingester → Ready 까지 wait
 4 telemetrygen 으로 신호 쏘고 ClickHouse spans metrics logs 줄 수 늘었는지 확인
 
 이걸 셸 스크립트 하나로 묶어줘 (README 에 명령어만 적는 건 귀찮을 거 같아서 pass)
@@ -331,7 +333,7 @@ telemetrygen 은 등록 안 된 서비스라 agents 에는 안 들어가는 거 
 
 끝났다는 거
 - Job 다 성공 종료
-- 수집기 적재 처리기 파드 Ready 에 /readyz 200
+- Collector Ingester 파드 Ready 에 /readyz 200
 - telemetrygen 신호가 ClickHouse 까지 도착
 - README 로컬 실행 절 채우기
 - AGENTS.md §1 표를 Helm 말고 base overlays 모양으로 고치기, §5 §6 갱신
@@ -351,7 +353,7 @@ telemetrygen 은 등록 안 된 서비스라 agents 에는 안 들어가는 거 
 
 - base : `namespaces/` · `infra/{kafka,clickhouse,postgres,kafka-init}` · `schema/{postgres-migrate,clickhouse-migrate}` · `apps/{collector,ingester}` · `checks/telemetrygen`
 - 넣는 곳 : `overlays/local/{0-namespaces,1-infra,2-jobs,3-apps,4-checks}` · `overlays/eks/{0~3}`(자리만, 채울 것은 각 파일 주석)
-- `scripts/up-local.sh` (올리기 + 관통 확인 · `--down`)
+- `scripts/up-local.sh` (올리기 + E2E 확인 · `--down`)
 
 ### 돌린 결과
 
@@ -364,8 +366,8 @@ telemetrygen 은 등록 안 된 서비스라 agents 에는 안 들어가는 거 
 
 ### 실행하다 찾아서 고친 것
 
-- **관통 확인이 telemetrygen 없이도 통과할 수 있었다**
-  - 1번째 실행의 metrics_raw 659 · logs 108 은 telemetrygen 것이 아니었다 : 수집기 · 적재 처리기 자신의 에이전트가 같은 수집기(`collector:4317`)로 보낸 것이다 (자기 감시, backend `#208`. 이미지 안 에이전트 설정이 클러스터 안에서도 그대로 닿았다)
+- **E2E 확인이 telemetrygen 없이도 통과할 수 있었다**
+  - 1번째 실행의 metrics_raw 659 · logs 108 은 telemetrygen 것이 아니었다 : Collector · Ingester 자신의 에이전트가 같은 Collector(`collector:4317`)로 보낸 것이다 (자기 감시, backend `#208`. 이미지 안 에이전트 설정이 클러스터 안에서도 그대로 닿았다)
   - logs 108 줄 중 telemetrygen 은 3 줄 (monimo-collector 43 · monimo-ingester 63)
   - 그래서 셈을 `service_name = 'telemetrygen'` 으로 좁혔다. 2 · 3번째는 이 셈으로 3 → 6 · 0 → 3 처럼 telemetrygen 몫만 늘었다
 - **macOS 기본 bash 가 3.2 다** : 연관 배열(`declare -A`)이 없어 `before_<표>` 변수로 바꿨다
@@ -404,10 +406,10 @@ telemetrygen 은 등록 안 된 서비스라 agents 에는 안 들어가는 거 
 - **`/readyz` 는 관리 포트가 아니라 업무 포트다** (이슈 본문 완료 조건이 「관리 포트 `/readyz` 200」이었다). backend `application.yml` 이 업무 포트(8081 · 8082)에 `/livez` · `/readyz` 를 연다(`add-additional-paths`). 이슈 본문을 고쳤다
 - **준비 Job 은 넷이 아니라 셋 + 인증서 단계다** (6절 1-B). 이슈 본문을 고쳤다
 - Kafka 는 `enableServiceLinks: false` 가 필요하다 : 안 끄면 쿠버네티스가 `KAFKA_PORT=tcp://...` 를 넣고 공식 이미지가 `KAFKA_*` 를 전부 설정으로 바꿔 기동이 깨진다. 처음부터 꺼서 실제로 깨지는 것은 안 봤다 (알려진 함정이라 미리 막았다)
-- `Warning: spec.SessionAffinity is ignored for headless services` 가 한 번 찍힌다. 우리가 적은 칸이 아니라 API 서버가 기본값을 넣으며 내는 경고라 그대로 둔다
+- `Warning: spec.SessionAffinity is ignored for headless services` 가 한 번 찍힌다. 우리가 적은 칸이 아니라 API server 가 기본값을 넣으며 내는 경고라 그대로 둔다
 
 ### 남은 것 (이 이슈 밖)
 
 - EKS 값 채우기(`overlays/eks/`) : 4~6단계. 마이그레이션 SQL 은 5단계에서 이미지에 굽는다 (`AGENTS.md` §6)
 - 쇼핑몰 · api-server · detector · notifier 를 쿠버네티스에 : 별 이슈
-- TLS 를 켠 관통(`optional` · `require`) : `telemetrygen` 이 평문이라 `require` 에서는 끊긴다. 켜서 돌려 보지는 않았다
+- TLS 를 켠 E2E(`optional` · `require`) : `telemetrygen` 이 평문이라 `require` 에서는 끊긴다. 켜서 돌려 보지는 않았다

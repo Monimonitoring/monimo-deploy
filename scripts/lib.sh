@@ -21,7 +21,7 @@ require_local_context() {
     || fail "로컬 전용 스크립트다. 컨텍스트가 $CONTEXT (docker-desktop 이 아니면 ALLOW_OTHER_CONTEXT=1)"
 }
 
-# 앞 묶음이 제한 시간 안에 안 서면 여기서 멈추고 원인을 보여 준다
+# 앞 단계가 제한 시간 안에 안 서면 여기서 멈추고 원인을 보여 준다
 wait_rollout() {   # $1 = 네임스페이스, $2 = 종류/이름
   k -n "$1" rollout status "$2" --timeout="$TIMEOUT" > /dev/null \
     && ok "$2 Ready" \
