@@ -1,5 +1,7 @@
 # 2026-10-17 로컬 쿠버네티스에 수집 경로
 
+> 용어만 glossary(`monimo-backend/docs/design/glossary.md`) 기준으로 바꿈 (`#240`) : 원문 인용도 용어만 바꾸고 문장은 그대로 뒀다
+
 - 관련 이슈 : `#14`
 - 쓴 도구 : 코드 리뷰 서브에이전트 1개(구현 뒤, 만든 쪽과 다른 자리), backend `compose.yaml` · `application*.yml` · `scripts/check-pipeline.sh` · `scripts/certs/` 읽기, 로컬 클러스터 실측
 - 결과물 : [`research.md`](research.md) 6 · 7 · 8 · 9절 · 바탕화면 가이드(레포 밖) · 매니페스트 · `scripts/up-local.sh`
@@ -39,5 +41,5 @@ K8s(메니페스트)는 메니페스트를 읽고 클러스터 속 컨트롤러�
 |---|---|
 | 10/14 조사가 「같은 containerd 를 쓰므로」 · 「`IfNotPresent` 로 안 두면 멈춘다」 · 「50 GB 를 그만큼 잡는다」 · 「끝 모양은 차트 + values」 라고 썼다 | 승조가 절마다 쉽게 설명해 달라고 할 때 다시 읽다 찾았다. 시험 파드(`docker://` 컨테이너 번호) · `kubectl get sc` · `df` 실측으로 고쳤다 (2.2 · 2.3 · 2.4) |
 | 이슈 본문 완료 조건이 「관리 포트 `/readyz`」 · 「Job 넷」 이었다 | 가이드를 쓰며 backend `application.yml` 을 읽다 찾았다. 이슈 본문 · `plan.md` 를 고쳤다 |
-| 관통 확인을 전체 줄 수로 짰다 : 자기 감시 신호 때문에 telemetrygen 없이도 통과할 수 있었다 | 첫 실행 숫자(logs 108)가 3개씩 보낸 것과 안 맞아 `service_name` 별로 셌다 |
+| E2E 확인을 전체 줄 수로 짰다 : 자기 감시 신호 때문에 telemetrygen 없이도 통과할 수 있었다 | 첫 실행 숫자(logs 108)가 3개씩 보낸 것과 안 맞아 `service_name` 별로 셌다 |
 | 스크립트가 Job 실패를 제한 시간 끝까지 기다리고, `/readyz` · 줄 수 조회 실패에서 말없이 끝났다. base 이미지 이름이 Docker Hub 로 풀렸다. Kafka 로그 폴더가 볼륨 꼭대기였다(EBS `lost+found`) | 리뷰 서브에이전트가 찾았다 (치명 0 · 중간 4 · 낮음 9). 중간 넷과 낮음 대부분을 반영했다 |

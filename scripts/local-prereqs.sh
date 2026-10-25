@@ -64,7 +64,7 @@ apply_from_files data pg-migrations "$BACKEND_DIR/db/postgres"
 apply_from_files data ch-migrations "$BACKEND_DIR/db/clickhouse"
 
 # 인증서 : compose 의 otlp-certs 와 같은 이미지 · 같은 폴더(backend certs/)를 쓴다. 없으면 만들고 있으면 아무것도 안 한다.
-# 같은 폴더라 compose 쪽 쇼핑몰이 믿는 기관과 같다. 수집기에는 셋(ca · server)만 Secret 으로 건다
+# 같은 폴더라 compose 쪽 쇼핑몰이 믿는 기관과 같다. Collector 에는 셋(ca · server)만 Secret 으로 건다
 docker run --rm -v "$BACKEND_DIR/certs:/certs" monimo/otlp-certs:dev > /dev/null
 k -n apm create secret generic otlp-certs-collector \
   --from-file=ca.crt="$BACKEND_DIR/certs/ca.crt" \

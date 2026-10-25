@@ -70,7 +70,7 @@ spec:
             - name: KAFKA_LOG_DIRS
               value: /var/lib/kafka/data/logs
           # compose 헬스체크는 raw.dlq 토픽까지 봤지만 여기서는 브로커가 응답하는지만 본다 :
-          # 토픽은 다음 묶음(kafka-init)이 만드는데, 그 묶음은 이 파드가 Ready 가 돼야 넣는다
+          # 토픽은 다음 단계(kafka-init)가 만드는데, 그 단계는 이 파드가 Ready 가 돼야 넣는다
           readinessProbe:
             exec:
               command: ["sh", "-c", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list > /dev/null"]

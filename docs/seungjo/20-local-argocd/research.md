@@ -1,10 +1,12 @@
 # `#20` 로컬 쿠버네티스에 ArgoCD 를 올려 manual sync 로 연습한다
 
+> 용어만 glossary(`monimo-backend/docs/design/glossary.md`) 기준으로 바꿈 (`#240`) : 원문 인용도 용어만 바꾸고 문장은 그대로 뒀다
+
 이슈 `#20` · 2026-10-19 · 승조(`@SeungJo-02`)
 
 9단계 틀로 쓴다. 3 · 6 절은 승조 차례(질문과 선택)이고 8절은 구현 프롬프트다.
 
-> `#14` 가 매니페스트를 만들고 **순서는 `scripts/up-local.sh` 가** 지켰다(묶음 `apply -k` → `kubectl wait`). ADR `#66` ② 는 「배포 도구가 서면 훅으로 옮긴다」고 정했다. 이번은 그 옮기기를 로컬에서 먼저 해 보는 일이다. EKS 의 자동 sync(6단계)는 여기서 익힌 모양을 그대로 쓴다.
+> `#14` 가 매니페스트를 만들고 **순서는 `scripts/up-local.sh` 가** 지켰다(단계 `apply -k` → `kubectl wait`). ADR `#66` ② 는 「배포 도구가 서면 훅으로 옮긴다」고 정했다. 이번은 그 옮기기를 로컬에서 먼저 해 보는 일이다. EKS 의 자동 sync(6단계)는 여기서 익힌 모양을 그대로 쓴다.
 
 ---
 
@@ -17,7 +19,7 @@
 | | 지금 (`#14`) | 이번 |
 |---|---|---|
 | 클러스터에 넣는 것 | 내 컴퓨터의 `up-local.sh` 가 `kubectl apply -k` | **ArgoCD 가 GitHub 의 이 레포를 읽어** 넣는다 |
-| 순서 | 묶음 사이 `kubectl wait` | ArgoCD **sync wave · hook** |
+| 순서 | 단계 사이 `kubectl wait` | ArgoCD **sync wave · hook** |
 | 「지금 레포와 클러스터가 같은가」 | 알 길이 없다 | UI 에 `Synced` / `OutOfSync` 로 보인다 |
 | 언제 넣나 | 스크립트를 칠 때 | sync 를 누를 때 (manual). 자동은 6단계 EKS |
 
@@ -44,7 +46,7 @@
 | 로컬은 manual sync, 자동 sync 는 EKS (6단계) | `docs/plan.md` |
 | 매니페스트는 생 YAML + kustomize overlay, 넣는 곳은 `overlays/` | `#14` |
 | 비밀값 · 마이그레이션 SQL · 인증서는 레포에 두지 않는다 | `AGENTS.md` §2 |
-| 클러스터 입구는 화면 · API 만. ArgoCD UI 는 입구에 두지 않는다 (로컬은 `port-forward`) | `#11` · ADR `#62` |
+| 클러스터 Ingress 는 화면 · API 만. ArgoCD UI 는 Ingress 에 두지 않는다 (로컬은 `port-forward`) | `#11` · ADR `#62` |
 
 ---
 
@@ -87,14 +89,14 @@
   wave 0  네임스페이스
   wave 1  저장소 셋 (StatefulSet)          ← Healthy = 파드 Ready  (= up-local.sh 1 의 wait)
   wave 2  준비 Job 셋                      ← Healthy = 성공 종료    (= up-local.sh 2 의 wait)
-  wave 3  수집기 · 적재 처리기               ← Healthy = 파드 Ready  (= up-local.sh 3 의 wait)
+  wave 3  Collector · Ingester               ← Healthy = 파드 Ready  (= up-local.sh 3 의 wait)
   ```
 
 **hook (특정 시점에 한 번 도는 것)**
 
 - `argocd.argoproj.io/hook: PreSync | Sync | PostSync | SyncFail` 주석을 붙인 자원은 「늘 있어야 하는 것」이 아니라 **sync 할 때마다 한 번 도는 것**이 된다
   - PreSync : 본 자원을 넣기 전에 (예 : 마이그레이션)
-  - PostSync : 본 자원이 다 Healthy 가 된 뒤에 (예 : 관통 확인)
+  - PostSync : 본 자원이 다 Healthy 가 된 뒤에 (예 : E2E 확인)
 - 지우는 시점은 `argocd.argoproj.io/hook-delete-policy` 로 고른다 : `BeforeHookCreation`(다음 sync 때 지우고 새로) · `HookSucceeded`(성공하면 바로) · `HookFailed`
 - ADR `#66` ② 의 「훅으로 옮긴다」가 이것이다
 
@@ -201,7 +203,7 @@
 |---|---|---|
 | **ㄱ 공식 매니페스트 (`install.yaml`) 를 버전 고정해 `kubectl apply`** | 문서의 기본 길이다. 파일 하나 · 명령 하나. 우리 레포가 Helm 을 안 쓰는 것(`#14`)과 맞다 | 설정을 바꾸려면 `argocd-cm` 등을 따로 패치해야 한다 |
 | **ㄴ 공식 Helm 차트 (`argo/argo-cd`)** | 설정을 values 하나에 모은다. EKS 에서 흔한 길 | 이 레포에 Helm 이 처음 들어온다 (`#14` 가 피한 것) |
-| **ㄷ core 설치 (`core-install.yaml`)** | UI · API 서버 없이 가볍다 | **UI 가 없다.** 이번 목표(sync 결과 · 실패를 눈으로 읽기)와 안 맞는다 |
+| **ㄷ core 설치 (`core-install.yaml`)** | UI · API server 없이 가볍다 | **UI 가 없다.** 이번 목표(sync 결과 · 실패를 눈으로 읽기)와 안 맞는다 |
 
 - 설치 매니페스트를 레포에 어떻게 둘지도 같이 정한다 : `argocd/install/kustomization.yaml` 이 GitHub 의 고정 버전 URL 을 가리키게 하면, 파일을 복사하지 않고 버전 한 줄로 관리된다
 - 버전 : 안정판 `v3.5.5`(10/12) 와 한 줄 아래 `v3.4.11`(같은 날). 로컬 CLI 는 `v3.4.2`
@@ -210,9 +212,9 @@
 
 | 갈래 | 장점 | 단점 |
 |---|---|---|
-| **ㄱ App of Apps : 묶음마다 Application 하나** (`0-namespaces` · `1-infra` · `2-jobs` · `3-apps`) | `overlays/local/` 모양 그대로. 연습 목표 「App of Apps」 를 그대로 밟는다. UI 에서 묶음별로 상태가 보인다 | Application 끼리 순서를 지키려면 2.4 의 상태 판정 설정이 필요하다 |
+| **ㄱ App of Apps : 단계마다 Application 하나** (`0-namespaces` · `1-infra` · `2-jobs` · `3-apps`) | `overlays/local/` 모양 그대로. 연습 목표 「App of Apps」 를 그대로 밟는다. UI 에서 단계별로 상태가 보인다 | Application 끼리 순서를 지키려면 2.4 의 상태 판정 설정이 필요하다 |
 | **ㄴ Application 하나에 전부 + 자원마다 sync wave** | 순서가 한 Application 안에서 끝나 2.4 함정이 없다 | `overlays/local/` 를 하나로 묶는 kustomization 이 하나 더 생긴다. App of Apps 연습이 빠진다 |
-| **ㄷ ApplicationSet** (폴더를 읽어 Application 을 찍어 낸다) | 폴더가 늘어도 손이 안 간다 | 묶음이 넷이라 과하다. 개념이 하나 더 는다 |
+| **ㄷ ApplicationSet** (폴더를 읽어 Application 을 찍어 낸다) | 폴더가 늘어도 손이 안 간다 | 단계가 넷이라 과하다. 개념이 하나 더 는다 |
 
 ### 5.3 준비 Job 셋을 무엇으로 두나
 
@@ -222,7 +224,7 @@
 | **ㄴ 보통 자원 + sync wave 2 + `Replace=true`** | 늘 목록에 보인다. 바뀔 때만 다시 돈다 | 안 바뀌면 다시 안 돈다 : 저장소를 지우고 다시 만든 뒤에는 표가 없는데 Job 은 「이미 성공」으로 남는다 |
 | **ㄷ 보통 자원 + `ttlSecondsAfterFinished`** | 쿠버네티스가 알아서 치운다 | 치우는 순간 ArgoCD 가 「없어졌다」로 OutOfSync 를 띄운다. 연습 중 헷갈린다 |
 
-- 관통 확인 `telemetrygen` 도 같은 질문이다 : `PostSync` hook 으로 두면 「sync 가 끝날 때마다 관통 확인」이 된다
+- E2E 확인 `telemetrygen` 도 같은 질문이다 : `PostSync` hook 으로 두면 「sync 가 끝날 때마다 E2E 확인」이 된다
 
 ### 5.4 네임스페이스를 ArgoCD 가 관리하나
 
@@ -273,20 +275,20 @@ ArgoCD가 읽는 브랜치는 ... 작업중엔 push 로만 PR 올릴 때는 deve
 
 - **5.1 : ㄱ 공식 매니페스트**
   - 버전은 안정판 `v3.5.x` 의 가장 최근 패치로 고정한다. `argocd/install/kustomization.yaml` 이 GitHub 의 그 버전 URL 을 가리키게 해서 파일 복사 없이 버전 한 줄로 관리
-- **5.2 : ㄱ App of Apps (묶음마다 Application 하나)**
-  - root 가 `argocd/apps/` 폴더를 가리키고, 그 폴더의 자식 Application 넷(`0-namespaces` · `1-infra` · `2-jobs` · `3-apps`)에 sync wave 를 붙여 묶음 순서를 지킨다
+- **5.2 : ㄱ App of Apps (단계마다 Application 하나)**
+  - root 가 `argocd/apps/` 폴더를 가리키고, 그 폴더의 자식 Application 넷(`0-namespaces` · `1-infra` · `2-jobs` · `3-apps`)에 sync wave 를 붙여 단계 순서를 지킨다
   - 2.4 함정 대비 : 순서가 안 지켜지면 `argocd-cm` 에 Application 상태 판정 설정을 넣고 그것도 레포에 둔다
 - **5.3 : ㄱ hook**
-  - 준비 Job 셋은 sync 마다 지우고 새로(`BeforeHookCreation`). 관통 확인 `telemetrygen` 은 `PostSync` hook
+  - 준비 Job 셋은 sync 마다 지우고 새로(`BeforeHookCreation`). E2E 확인 `telemetrygen` 은 `PostSync` hook
 - **5.4 : ㄱ 관리하되 `Prune=false`** (승조 : 「혹시나 실수해서 날아가면 안되니까」)
 - **5.5 : ㄴ 작업 중 → ㄱ 마지막** (승조 : 「작업중엔 push 로만 PR 올릴 때는 develop」)
   - 작업 중 : `targetRevision: feat/20-local-argocd` → push 만 하면 확인
   - PR 올릴 때 : `targetRevision: develop` 으로 한 줄 바꾸고 머지. 최종은 머지된 것만 들어가고 EKS 와 같은 모양
 - **5.6 : ㄱ 둘 다 남긴다** (승조 : 「문제가 생기면 ArgoCD인지 메니페스트 인지 확인 가능 · ArgoCD 없이 띄울 수 있다」)
   - 레포 밖 셋 넣기(지금 `up-local.sh` 0단계)를 `scripts/local-prereqs.sh` 로 떼어 두 길이 같이 쓴다
-  - `up-local.sh` : `local-prereqs` → `kubectl` 로 묶음 → 관통 확인 (ArgoCD 없이, 데모 비상 대책)
+  - `up-local.sh` : `local-prereqs` → `kubectl` 로 단계 → E2E 확인 (ArgoCD 없이, 데모 비상 대책)
   - `up-argocd.sh` : ArgoCD 설치 → `local-prereqs` → root 넣기 (sync 는 사람이)
-  - 남는 단점 : 묶음 순서가 두 곳(스크립트 차례 · sync wave)에 적힌다 → README 에 「순서를 바꾸면 둘 다 고친다」
+  - 남는 단점 : 단계 순서가 두 곳(스크립트 차례 · sync wave)에 적힌다 → README 에 「순서를 바꾸면 둘 다 고친다」
 
 ---
 
@@ -317,7 +319,7 @@ argocd/
 
 scripts/
   local-prereqs.sh               레포 밖 셋 (네임스페이스를 먼저 만들고 Secret · SQL ConfigMap · 인증서)
-  up-local.sh                    local-prereqs → kubectl 로 묶음 → 관통 확인   (ArgoCD 없이, 그대로)
+  up-local.sh                    local-prereqs → kubectl 로 단계 → E2E 확인   (ArgoCD 없이, 그대로)
   up-argocd.sh                   ArgoCD 설치 → local-prereqs → root 넣기 → UI 들어가는 법 출력
 ```
 
@@ -333,21 +335,21 @@ scripts/
   └ root 넣기
 UI (port-forward) 에서 root Sync
   └ wave 0 namespaces → wave 1 infra (Healthy 까지) → wave 2 jobs (hook 성공까지) → wave 3 apps
-관통 확인 (telemetrygen → ClickHouse 줄 수)
+E2E 확인 (telemetrygen → ClickHouse 줄 수)
 ```
 
 ### 구현 전에 짚을 것 넷 (구현 때 실측으로 정한다)
 
 - **① 자식 Application 끼리 순서가 지켜지나 (2.4)** : 먼저 설정 없이 sync 해서 순서가 지켜지는지 본다. 한꺼번에 들어가면 `argocd-cm` 에 Application 상태 판정을 넣고(`argocd/install/` 패치) 다시 본다. 둘 다 9절에 적는다 (연습 목표 「sync 실패 읽기」 와도 겹친다)
 - **② hook 만 든 자식(2-jobs)은 언제 Healthy 인가** : hook 은 평소 자원 목록에 안 잡혀서, Job 이 끝나기 전에 자식이 Healthy 로 보이고 3-apps 가 먼저 들어갈 수 있다. 그러면 준비 Job 셋을 **3-apps 의 `PreSync` hook** 으로 옮긴다 (앱 넣기 직전에 같은 자식 안에서 돈다). 실측으로 정한다
-- **③ 관통 확인은 hook 이 아니라 스크립트로** : 「보내기 전 줄 수 → 보내기 → 늘었나」를 세야 해서 Job 하나로는 안 끝난다. `up-local.sh` 4단계를 `scripts/check-local.sh` 로 떼어 두 길이 같이 쓴다 (5.3 에서 `PostSync` hook 으로 적은 것을 바꾼다)
+- **③ E2E 확인은 hook 이 아니라 스크립트로** : 「보내기 전 줄 수 → 보내기 → 늘었나」를 세야 해서 Job 하나로는 안 끝난다. `up-local.sh` 4단계를 `scripts/check-local.sh` 로 떼어 두 길이 같이 쓴다 (5.3 에서 `PostSync` hook 으로 적은 것을 바꾼다)
 - **④ `targetRevision` 바꾸기** : root 와 자식 넷 다섯 곳이다. PR 직전에 `develop` 으로 바꾸고 한 번 더 sync 해서 본다
 
 ### 연습할 것 (9절에 결과)
 
 - **sync 실패** : 이미지 태그를 없는 값으로 → `Degraded` · 이벤트에서 `ErrImagePull` 읽기 / 매니페스트 문법 오류 → `ComparisonError` 읽기
 - **prune** : 레포에서 자원 하나(예 : ingester Service)를 지우고 Prune 없이 sync → OutOfSync 표시만 / Prune 켜고 sync → 지워짐 / 네임스페이스 파일을 지워 보고 `Prune=false` 가 막는지
-- **push → sync** : 수집기 환경변수 하나를 바꿔 push → OutOfSync · diff → Sync → 파드가 바뀜
+- **push → sync** : Collector 환경변수 하나를 바꿔 push → OutOfSync · diff → Sync → 파드가 바뀜
 
 ---
 
@@ -371,12 +373,12 @@ research.md 6절 7절에 정한 거 기준으로 하면 되고 정리하면 이�
 공식 매니페스트(install.yaml) 로
 버전은 v3.5.x 최근 패치로 고정해줘
 argocd/install/kustomization.yaml 이 GitHub 의 그 버전 URL 을 가리키게 해서 파일 복사 안 하고 버전 한 줄로 관리
-UI 는 입구에 안 두고 port-forward 로만
+UI 는 Ingress 에 안 두고 port-forward 로만
 
 Application
 App of Apps 로
 argocd/root.yaml 을 사람이 한 번 넣으면 root 가 argocd/apps/local 폴더를 가리킨다
-그 폴더에 자식 Application 넷 (0-namespaces 1-infra 2-jobs 3-apps) 두고 각자 overlays/local/<묶음> 을 가리키게
+그 폴더에 자식 Application 넷 (0-namespaces 1-infra 2-jobs 3-apps) 두고 각자 overlays/local/<단계> 을 가리키게
 자식 파일에 sync wave 0 1 2 3 붙여서 숫자 작은 거부터
 syncPolicy 는 비워서 manual sync 로 (자동은 EKS 에서 할 거)
 
@@ -400,8 +402,8 @@ develop 은 머지된 거만 들어가고 EKS 랑 같은 모양이니까 최종�
 레포 밖 값 넣기(Secret ConfigMap 인증서) 는 ArgoCD 가 못 하니까 up-local.sh 0단계를 scripts/local-prereqs.sh 로 떼어줘
 레포에는 Secret ConfigMap 이름만 있고 실제 값은 스크립트가 클러스터에 먼저 넣어야 파드가 켜질 때 받아 감
 네임스페이스도 local-prereqs 가 먼저 만들어야 Secret 넣을 방이 있음
-관통 확인(4단계) 도 scripts/check-local.sh 로 떼서 두 길이 같이 쓰게
-- up-local.sh : local-prereqs -> kubectl 로 묶음 -> check-local (ArgoCD 없이, 지금처럼 50초)
+E2E 확인(4단계) 도 scripts/check-local.sh 로 떼서 두 길이 같이 쓰게
+- up-local.sh : local-prereqs -> kubectl 로 단계 -> check-local (ArgoCD 없이, 지금처럼 50초)
 - up-argocd.sh : ArgoCD 설치 -> local-prereqs -> root 넣기 -> UI 들어가는 법(port-forward 랑 admin 비번) 출력
 sync 는 내가 UI 에서 누를 거
 순서가 스크립트랑 sync wave 두 군데 적히니까 README 에 「순서 바꾸면 둘 다 고친다」 적어줘
@@ -414,7 +416,7 @@ sync 는 내가 UI 에서 누를 거
 연습할 거 (9절에 결과)
 - sync 실패 : 없는 이미지 태그 -> Degraded 읽기 / yaml 문법 틀리기 -> ComparisonError 읽기
 - prune : 자원 하나 지우고 Prune 없이 sync -> OutOfSync 만 / Prune 켜고 sync -> 지워짐 / 네임스페이스 Prune=false 가 막는지
-- push -> sync : 수집기 환경변수 하나 바꿔서 push -> OutOfSync diff -> Sync -> 파드 바뀌는지
+- push -> sync : Collector 환경변수 하나 바꿔서 push -> OutOfSync diff -> Sync -> 파드 바뀌는지
 
 하면 안 되는 거
 - 비밀값 레포에 올리지 말기 (레포 퍼블릭)
@@ -425,7 +427,7 @@ sync 는 내가 UI 에서 누를 거
 끝났다는 거
 - ArgoCD 가 뜨고 UI 들어가짐
 - root sync 한 번에 자식 넷이 순서대로 Synced Healthy
-- check-local 관통 통과
+- check-local E2E 통과
 - 고쳐서 push 하고 sync 누르면 클러스터가 따라옴
 - 실패 하나 prune 하나 밟아 보고 9절에 적기
 - up-local.sh 도 그대로 50초에 통과 (안 깨졌는지)
@@ -446,7 +448,7 @@ sync 는 내가 UI 에서 누를 거
 |---|---|---|
 | 자식 넷 다 manual (`syncPolicy` 비움) | **root 만 manual, 자식은 automated** (prune · selfHeal 끔) | 전부 manual 이면 root 가 「자식 0 이 Healthy 가 될 때까지」 기다리는데 manual 자식은 누르기 전엔 Healthy 가 안 된다 : root sync 가 자식마다 멈춰 선다. 승조 확인 (가이드 ①) |
 | 자식 `2-jobs` (Job 셋, `Sync` hook) | **자식 `2-jobs` 를 없애고 Job 셋을 `local-apps` 의 `PreSync` hook 으로** | 아래 실측 ②. `local-apps` 가 `sources` 둘(`overlays/local/2-jobs` · `3-apps`)을 읽는다. overlay 는 그대로라 `up-local.sh` 길은 안 바뀐다 |
-| 관통 확인은 `PostSync` hook (6절 5.3) | **`scripts/check-local.sh`** | 「보내기 전 줄 수 → 보내기 → 늘었나」를 한 흐름으로 봐야 한다 (7절 ③, 가이드 ②) |
+| E2E 확인은 `PostSync` hook (6절 5.3) | **`scripts/check-local.sh`** | 「보내기 전 줄 수 → 보내기 → 늘었나」를 한 흐름으로 봐야 한다 (7절 ③, 가이드 ②) |
 
 ### 만든 것
 
@@ -463,13 +465,13 @@ base 주석                               네임스페이스 Prune=false · Job 
 base 고침                               StatefulSet 셋 volumeClaimTemplates 에 apiVersion · kind (실측 ③)
 ```
 
-- 번호표는 0 · 1 · 3 이다 (2 는 `local-apps` 안의 PreSync). 빈 번호는 `up-local.sh` 의 묶음 번호와 맞춰 두려고 남겼다
+- 번호표는 0 · 1 · 3 이다 (2 는 `local-apps` 안의 PreSync). 빈 번호는 `up-local.sh` 의 단계 번호와 맞춰 두려고 남겼다
 
 ### 실측
 
 - **① 상태 판정 패치 없이 root sync (11:00:49)**
   - 6초 만에 자식 넷이 **한꺼번에** 생겼다. root 는 자식이 Healthy 인지 안 보고 다음 번호로 갔다 (2.4 · 가이드 0절 그대로)
-  - 수집기는 떴고 적재 처리기는 표 · 토픽이 없어 `CrashLoopBackOff`
+  - Collector 는 떴고 Ingester 는 표 · 토픽이 없어 `CrashLoopBackOff`
 - **② hook 만 든 자식(`2-jobs`)은 Job 을 한 번도 안 돌렸다** (7절 ② 보다 나빴다)
   - 7절 ② 는 「Job 이 끝나기 전에 Healthy 로 보일 수 있다」였는데 실제는 **Job 이 아예 안 생겼다**
   - hook 은 「평소 자원」이 아니라서 Job 만 든 자식은 처음부터 `Synced · Healthy` 로 보인다. automated 는 **OutOfSync 일 때만** sync 하므로 hook 을 돌릴 sync 가 안 일어난다
@@ -484,25 +486,25 @@ base 고침                               StatefulSet 셋 volumeClaimTemplates �
   | `up-argocd.sh` | 21초 (ArgoCD 파드 일곱 Ready + local-prereqs + root 넣기) |
   | t+3s | `local-namespaces` Synced · Healthy, `local-infra` Progressing |
   | t+20s | `local-infra` Healthy → 그제야 `local-apps` 생김 · Job 셋 Running |
-  | t+29s | Job 셋 Complete → 수집기 · 적재 처리기 생김 |
+  | t+29s | Job 셋 Complete → Collector · Ingester 생김 |
   | t+39s | 셋 다 Synced · Healthy |
   | `check-local.sh` | spans 0 → 6 · metrics_raw 0 → 3 · logs 0 → 3 |
 
-  - 적재 처리기 재시작 0 : Job 이 앱보다 먼저 끝났다
+  - Ingester 재시작 0 : Job 이 앱보다 먼저 끝났다
   - **root 자체의 sync 는 16초에 Succeeded 로 끝난다** : 마지막 번호(`local-apps`)를 만든 뒤에는 그 자식이 Healthy 가 될 때까지 기다리지 않는다. 「다 섰나」는 `argocd app list` 로 자식을 본다
 - **⑤ 한 번 걸린 것** : 첫 시도(③ 전)에 `postgres-migrate` 컨테이너가 Flyway 「Successfully applied 15 migrations」 뒤에도 Running 으로 남았다 (`docker top` 은 비어 있고 `exec` 는 「stopped state」). 파드를 지우니 Job 이 새 파드로 바로 성공했고, 다시 돌린 ④ 에서는 재현되지 않았다. Docker Desktop 쪽 이상으로 보고 기록만 한다. PreSync 는 Job 이 안 끝나면 앱을 안 넣으므로 이때 `local-apps` 는 `Running : waiting for completion of hook` 으로 멈춰 있었다
 - `up-local.sh` (나눈 뒤) : 빈 클러스터에서 52초 통과, 모르는 인자는 막힘
 
 ### 연습 (전부 되돌렸다)
 
-- **push → sync** : 수집기 `LOGGING_LEVEL_COM_MONIMO_COLLECTOR` 를 `debug` 로 push (11:14:02)
+- **push → sync** : Collector `LOGGING_LEVEL_COM_MONIMO_COLLECTOR` 를 `debug` 로 push (11:14:02)
   - +201초 `local-apps` OutOfSync (ArgoCD 가 레포를 3분마다 본다, 웹훅 없음) → +211초 스스로 sync · 새 파드 → +221초 옛 파드 내려감
   - PreSync 라 Job 셋도 같이 다시 돌았다 (셋 다 다시 돌려도 안전하다)
   - 기다리기 싫으면 `argocd app get local-apps --refresh`
 - **root 는 manual 인지** : 자식 파일(`argocd/apps/local/1-infra.yaml`)에 `info` 한 줄을 넣어 push → root 새로고침
   - root `OutOfSync`, `argocd app diff root` 에 그 세 줄이 보인다. 60초 동안 클러스터의 `local-infra` 에는 안 들어갔다
   - `argocd app sync root` → 그제야 들어갔다 (`application.argoproj.io/local-infra configured`)
-- **sync 실패 ① 없는 이미지 태그** (수집기 `newTag: no-such-tag`)
+- **sync 실패 ① 없는 이미지 태그** (Collector `newTag: no-such-tag`)
   - sync 자체는 **Succeeded** 다 : 매니페스트는 잘 들어갔고, 실패는 그 뒤 파드에서 난다
   - 새 파드 `ErrImagePull` ↔ `ImagePullBackOff` 를 오가고 **옛 파드는 계속 떠 있다** (롤링 업데이트라 새 파드가 Ready 가 돼야 옛 것을 내린다). 수집은 안 끊긴다
   - 앱 상태는 `Progressing` 으로 머물다가 **+609초에 `Degraded`** 가 됐다. Deployment 의 기다림 한도(`progressDeadlineSeconds` 기본 600초)를 넘겨 `ProgressDeadlineExceeded` 가 붙은 때다. 10분 동안은 「아직 뜨는 중」과 구분이 안 된다

@@ -28,9 +28,9 @@
 | `infra/` | 저장소 셋 StatefulSet + Headless Service (Kafka · ClickHouse · PostgreSQL) · 토픽 Job `kafka-init` |
 | `schema/` | 마이그레이션 Job (`postgres-migrate` · `clickhouse-migrate`). SQL 파일은 두지 않는다 (§2) |
 | `apps/` | 서비스 Deployment + Service. **폴더 하나 = 배포 단위 하나** |
-| `checks/` | 관통 확인 Job (`telemetrygen`) |
-| `overlays/local/` · `overlays/eks/` | 넣는 곳. 묶음 `0-namespaces` → `1-infra` → `2-jobs` → `3-apps` (→ `4-checks`) 순서로 넣는다 |
-| `scripts/` | 로컬 전용. `up-local.sh` : 묶음을 차례로 넣고 `kubectl wait` 로 기다린다 · `up-argocd.sh` : 로컬 ArgoCD 를 띄우고 root 를 넣는다 · 둘이 같이 쓰는 `local-prereqs.sh`(레포 밖 준비물 : Secret · SQL · 인증서) · `check-local.sh`(관통 확인) · `lib.sh` |
+| `checks/` | E2E 확인 Job (`telemetrygen`) |
+| `overlays/local/` · `overlays/eks/` | 넣는 곳. 단계 `0-namespaces` → `1-infra` → `2-jobs` → `3-apps` (→ `4-checks`) 순서로 넣는다 |
+| `scripts/` | 로컬 전용. `up-local.sh` : 단계를 차례로 넣고 `kubectl wait` 로 기다린다 · `up-argocd.sh` : 로컬 ArgoCD 를 띄우고 root 를 넣는다 · 둘이 같이 쓰는 `local-prereqs.sh`(레포 밖 준비물 : Secret · SQL · 인증서) · `check-local.sh`(E2E 확인) · `lib.sh` |
 | `argocd/` | `install/` : 공식 install.yaml 고정 버전(`v3.5.5`) + Application 상태 판정 패치 · `root.yaml` : 뿌리(manual) · `apps/local/` : 자식 셋(automated, prune · selfHeal 끔), sync wave 0 · 1 · 3. 준비 Job 셋은 `local-apps` 의 PreSync hook |
 | `charts/` | 비어 있다 (Helm 으로 옮기게 되면) |
 | `compose/` | Phase 1a 단일 노드 docker-compose |
@@ -60,10 +60,11 @@
 - `.env.example` — Phase 1a compose 용 이미지 · 인프라 계정 이름 (`#2`)
 - CODEOWNERS (`#3`), develop 브랜치 전략 (`#4`), 설계 문서 링크를 `tree/HEAD` 로 (`#5`)
 - `AGENTS.md` · `CLAUDE.md`, README 「AI 와 일한 방법」 절, `docs/prompts/`(프롬프트 로그 : 코드와 같은 PR 에). 하네스 정본은 backend `docs/seungjo/harness.md` 한 곳
-- `#62` ⑤ 부분 개정 (`#11`, backend `#159` 에이전트 mTLS · ADR `#64`) : 입구(Traefik + NLB)에서 수집기 gRPC 통로를 뺀다. 바깥 에이전트는 안 받고 TLS 는 수집기가 직접 끝낸다(mTLS). 문서만. `docs/seungjo/9-eks-foundation/` README 표 E 행 · research 2.6
+- `#62` ⑤ 부분 개정 (`#11`, backend `#159` 에이전트 mTLS · ADR `#64`) : Ingress(Traefik + NLB)에서 Collector gRPC 통로를 뺀다. 바깥 에이전트는 안 받고 TLS 는 Collector 가 직접 끝낸다(mTLS). 문서만. `docs/seungjo/9-eks-foundation/` README 표 E 행 · research 2.6
 - 로컬 ArgoCD (`#20`, `docs/plan.md` 3단계). 공식 install.yaml `v3.5.5` 고정 · App of Apps(root manual · 자식 셋 automated, prune · selfHeal 끔) · sync wave · 준비 Job 셋은 `local-apps` 의 PreSync hook · 네임스페이스 `Prune=false` · Application 상태 판정(`argocd-cm`). 스크립트를 `local-prereqs.sh` · `check-local.sh` · `lib.sh` 로 나눠 `up-local.sh` 와 `up-argocd.sh` 가 같이 쓴다. 실측 · 연습 결과는 `docs/seungjo/20-local-argocd/research.md` 9절
-- 로컬 쿠버네티스에 수집 경로 (`#14`, `docs/plan.md` 1단계). 생 YAML + kustomize overlay · 저장소 셋 StatefulSet(공식 이미지) · 준비 Job 셋 · 수집기 · 적재 처리기 · `telemetrygen` 관통 확인을 `scripts/up-local.sh` 하나로. 이미지는 로컬 빌드 태그 + `IfNotPresent`. SQL · 인증서 · 비밀값은 레포 밖(스크립트가 넣는다). `overlays/eks/` 는 자리만. `docs/seungjo/14-local-k8s-collect/research.md`
+- 로컬 쿠버네티스에 수집 경로 (`#14`, `docs/plan.md` 1단계). 생 YAML + kustomize overlay · 저장소 셋 StatefulSet(공식 이미지) · 준비 Job 셋 · Collector · Ingester · `telemetrygen` E2E 확인을 `scripts/up-local.sh` 하나로. 이미지는 로컬 빌드 태그 + `IfNotPresent`. SQL · 인증서 · 비밀값은 레포 밖(스크립트가 넣는다). `overlays/eks/` 는 자리만. `docs/seungjo/14-local-k8s-collect/research.md`
 - 1b EKS 배포 기반 결정 (`#9`, backend ADR `#62`). 서울 · 데이터 온디맨드 t3.large 1대(한 AZ) + 앱 Spot t3.large 2대 · 정해진 시간만 켬(발표 전 상시) · NAT 인스턴스(fck-nat) · Traefik + NLB · 공식 이미지 StatefulSet + EBS(Retain) · External Secrets · CI 가 GitHub App 토큰으로 `image.tag` 커밋 · 관리형 노드 그룹 고정. 월 약 $167 ~ 220. `docs/seungjo/9-eks-foundation/`
+- 2026-10-26 문서 · 주석의 우리말 조어를 현업 이름으로 바꿨다 (backend `#240` · ADR `#73`). 코드 안 문자열(테스트 이름 · 스크립트 출력)은 backend `#241`
 
 ## 6. 지금 막혀 있는 것
 
@@ -71,7 +72,7 @@
 |---|---|
 | **~~폴더 7개가 전부 비어 있다~~ (`#14` 로 해소 : `namespaces` · `infra` · `schema` · `apps` 가 찼다. `argocd` 는 `#20`. `charts` · `compose` 는 아직)** | 로컬 쿠버네티스에는 수집 경로가 선다. EKS 값(`overlays/eks/`)은 자리만 있다 |
 | `compose/` 단일 노드 compose 가 없다 | Phase 1a 를 한 서버에 올릴 방법이 없다 |
-| 로컬 쿠버네티스에 올라간 것은 수집 경로뿐이다 (쇼핑몰 · api-server · detector · notifier 없음) | 화면 · 경보까지의 관통은 아직 compose 로만 된다. `telemetrygen` 으로는 서버맵 · 파드 이름표를 못 본다 |
+| 로컬 쿠버네티스에 올라간 것은 수집 경로뿐이다 (쇼핑몰 · api-server · detector · notifier 없음) | 화면 · 경보까지의 E2E 는 아직 compose 로만 된다. `telemetrygen` 으로는 Service map · 파드 이름표를 못 본다 |
 | 마이그레이션 SQL 이 EKS 로 갈 길이 없다 | 로컬은 스크립트가 backend `db/` 를 ConfigMap 으로 넣지만 EKS 에는 그 폴더가 없다. 5단계(CI → ECR)에서 마이그레이션 이미지에 SQL 을 굽는다 (backend 쪽 Dockerfile) |
 | AWS 계정 · 결제 · 예산 알림, 도메인이 없다 (~~GitHub App~~ 은 2026-10-16 준비됨) | Terraform apply(`#17`) · cert-manager 인증서가 막힌다 |
 | 발표가 11월 4주로 밀렸다 (날짜 정본 `docs/plan.md`) | Terraform 이 이틀 넘게 막히면 eksctl 로 내린다. EKS 가 끝내 안 되면 로컬 k8s 로 데모를 찍는다 (`scripts/up-local.sh` · `up-argocd.sh` 가 그 바닥이다) |

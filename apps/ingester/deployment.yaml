@@ -1,4 +1,4 @@
-# 적재 처리기. 상태가 없어 Deployment. 환경변수는 backend compose.yaml 의 ingester 를 옮기고 주소만 바꿨다
+# Ingester. 상태가 없어 Deployment. 환경변수는 backend compose.yaml 의 ingester 를 옮기고 주소만 바꿨다
 # 포트 : 8082 업무(/livez · /readyz) · 18082 관리(/actuator/**, 업무 포트 + 10000)
 apiVersion: apps/v1
 kind: Deployment

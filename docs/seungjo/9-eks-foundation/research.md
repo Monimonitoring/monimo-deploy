@@ -1,5 +1,7 @@
 # 리서치 : 1b EKS 배포 기반 결정
 
+> 용어만 glossary(`monimo-backend/docs/design/glossary.md`) 기준으로 바꿈 (`#240`) : 원문 인용도 용어만 바꾸고 문장은 그대로 뒀다
+
 - 날짜 2026-10-12 / 관련 이슈 `#9`
 - 쓴 도구 : 웹 리서치 서브에이전트 1개(서울 단가 · 도구 근거), backend ADR `#19` `#44` `#49` · Q6, 이 레포 AGENTS.md
 - 이 이슈는 결정만 한다. Terraform · 차트 코드는 다음 이슈
@@ -77,10 +79,10 @@
 
 ### 2.6 인그레스 : Traefik + NLB 로 HTTP 와 gRPC 를 한 문에
 
-> **개정 (2026-10-13, backend `#159` · ADR `#64`)** : 아래 "수집기 gRPC 를 입구로" 는 **빠졌다.** 쇼핑몰은 클러스터 안에서 서비스 이름으로 수집기에 붙어 입구를 안 지나고, 입구에서 TLS 를 끝내면 수집기가 보는 상대 주소가 입구 주소가 되어 backend `#149` 가 깨진다. 바깥 에이전트는 받지 않기로 했고 TLS 는 수집기가 직접 끝낸다(mTLS). 입구는 화면 · API 의 HTTP 만 받는다. 원문은 지우지 않고 남긴다
+> **개정 (2026-10-13, backend `#159` · ADR `#64`)** : 아래 "Collector gRPC 를 Ingress 로" 는 **빠졌다.** 쇼핑몰은 클러스터 안에서 서비스 이름으로 Collector 에 붙어 Ingress 를 안 지나고, Ingress 에서 TLS 를 끝내면 Collector 가 보는 상대 주소가 Ingress 주소가 되어 backend `#149` 가 깨진다. 바깥 에이전트는 받지 않기로 했고 TLS 는 Collector 가 직접 끝낸다(mTLS). Ingress 는 화면 · API 의 HTTP 만 받는다. 원문은 지우지 않고 남긴다
 
-- 수집기는 gRPC(OTLP 4317), 화면 · API 는 HTTP. Traefik 은 백엔드로 `scheme: h2c` 를 주면 gRPC 를 그대로 넘긴다 (개정으로 빠짐 : 위 인용)
-- NLB 는 L4(연결 단위 분산). TLS 를 Traefik 에서 끝내면 한 입구가 ALPN 으로 HTTP 와 gRPC 를 같이 받는다(추정, 첫 기동 때 확인)
+- Collector 는 gRPC(OTLP 4317), 화면 · API 는 HTTP. Traefik 은 백엔드로 `scheme: h2c` 를 주면 gRPC 를 그대로 넘긴다 (개정으로 빠짐 : 위 인용)
+- NLB 는 L4(연결 단위 분산). TLS 를 Traefik 에서 끝내면 한 Ingress 가 ALPN 으로 HTTP 와 gRPC 를 같이 받는다(추정, 첫 기동 때 확인)
 - 주의 : NLB TCP 유휴 타임아웃 기본 350초. 오래 열어 두는 gRPC 연결은 keepalive 필요. 인증서는 cert-manager HTTP-01(80 포트 열림 필요)
 - NLB 는 끌 수 없다. 스케줄로 끄려면 Service 를 지웠다 다시 만들어야 하고 그때마다 DNS 이름이 바뀐다 → **24시간 유지**
 
@@ -113,7 +115,7 @@
 - **Q. 온디맨드와 Spot 은 가격 말고 무엇이 다른가** → 2.2. 회수 · 못 받음 · 파드 이동. 데이터는 온디맨드, 앱은 Spot
 - **Q. 특정 시간에만 서버를 켜면 데이터가 전부 날아가는 것 아닌가** → 2.3. 노드만 내리고 데이터는 EBS · RDS 에 남는다
 - **Q. K8s + Argo CD 면 Image Updater 를 써야 하는 것 아닌가** → 2.8. 필수가 아니고, ADR 에 적힌 CI 커밋이 도구가 하나 적고 PR 과 기록이 이어진다
-- **Q. 로컬에서 k8s · Argo CD 를 먼저 확인할 수 있지 않나** → 된다(Helm · Argo · 관통 · 인그레스 · 스키마 Job · 디스크 보존). AWS 쪽(VPC · NAT · IAM · EBS AZ · Spot · NLB · ECR OIDC)은 EKS 에서만 확인된다. 로컬은 Docker Desktop k8s, 전부 띄움, 측정 때 다른 프로젝트 컨테이너를 내리고 Docker 메모리 22 ~ 24GB 로 증설. 시점은 미정(별도 이슈)
+- **Q. 로컬에서 k8s · Argo CD 를 먼저 확인할 수 있지 않나** → 된다(Helm · Argo · E2E · 인그레스 · 스키마 Job · 디스크 보존). AWS 쪽(VPC · NAT · IAM · EBS AZ · Spot · NLB · ECR OIDC)은 EKS 에서만 확인된다. 로컬은 Docker Desktop k8s, 전부 띄움, 측정 때 다른 프로젝트 컨테이너를 내리고 Docker 메모리 22 ~ 24GB 로 증설. 시점은 미정(별도 이슈)
 
 ## 4. 1차 정리
 
@@ -168,10 +170,10 @@ PostgreSQL 은 `#44` 가 이미 RDS 로 정했다 : db.t4g.micro 단일 AZ, 노�
 
 ```
 ~10/17    백엔드 수집 마무리 + #9 확정 + AWS 계정 · 도메인 · GitHub App 준비 (팀원 : API 연동)
-10/18~21  로컬 k8s(Docker Desktop) 수집 쪽 : 쇼핑몰 → 수집기 → Kafka → 적재 → CH
+10/18~21  로컬 k8s(Docker Desktop) 수집 쪽 : 쇼핑몰 → Collector → Kafka → 적재 → CH
 10/20~23  Terraform 작성, 22~23 첫 apply (VPC · NAT 인스턴스 · EKS 만, 확인 뒤 노드 0대)
-10/23~24  팀 API 연동분 차트 추가 + 로컬 전체 관통 (= 데모 비상 대책)
-10/25~27  CI → ECR, External Secrets, EKS 에 Argo CD, values 교체, 관통
+10/23~24  팀 API 연동분 차트 추가 + 로컬 전체 E2E (= 데모 비상 대책)
+10/25~27  CI → ECR, External Secrets, EKS 에 Argo CD, values 교체, E2E
 10/28     안정화 · 버퍼
 10/29~30  데모 촬영 (EKS, 안 되면 로컬 k8s)
 10/31     발표
@@ -185,7 +187,7 @@ PostgreSQL 은 `#44` 가 이미 RDS 로 정했다 : db.t4g.micro 단일 AZ, 노�
 2. Spot 을 어디에 쓰고 어디에 안 썼나. 이유는
 3. 노드를 매일 껐다 켜는데 Kafka · ClickHouse 데이터는 어떻게 지키나
 4. NAT 게이트웨이를 안 쓴 이유와 대가
-5. 한 입구로 HTTP 와 gRPC 를 어떻게 같이 받나
+5. 한 Ingress 로 HTTP 와 gRPC 를 어떻게 같이 받나
 6. Argo CD 를 쓰면서 이미지 태그는 누가 바꾸나
 
 ## 8. 구현 프롬프트 (사람 차례)
@@ -205,7 +207,7 @@ EKS 컨트롤 플레인, NLB, NAT 인스턴스는 24시간 켜 둔다 (NLB는 �
 
 NAT 게이트웨이는 비싸니까 NAT 인스턴스(fck-nat, t4g.nano)로 가자
 
-인그레스는 Traefik + NLB로 HTTP랑 수집기 gRPC를 한 문으로 받자 인증서는 cert-manager
+인그레스는 Traefik + NLB로 HTTP랑 Collector gRPC를 한 문으로 받자 인증서는 cert-manager
 
 Kafka랑 ClickHouse는 공식 이미지로 StatefulSet을 직접 만들고 EBS에 둔다 Bitnami는 무료 이미지 업데이트가 끊겨서 패스
 

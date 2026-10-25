@@ -1,5 +1,7 @@
 # 2026-10-12 1b EKS 배포 기반 결정
 
+> 용어만 glossary(`monimo-backend/docs/design/glossary.md`) 기준으로 바꿈 (`#240`) : 원문 인용도 용어만 바꾸고 문장은 그대로 뒀다
+
 - 관련 이슈 : `#9`
 - 쓴 도구 : 웹 리서치 서브에이전트 1개(서울 단가 · fck-nat · 노드 그룹 스케줄 · EBS CSI · Bitnami · Traefik gRPC · ESO · ECR OIDC · 비용 계산), backend ADR `#19` `#44` `#49` · Q6 읽기
 - 결과물 : [`research.md`](research.md) · 설계 한 장 [`README.md`](README.md). 코드는 없다
@@ -66,7 +68,7 @@ EKS 컨트롤 플레인, NLB, NAT 인스턴스는 24시간 켜 둔다 (NLB는 �
 
 NAT 게이트웨이는 비싸니까 NAT 인스턴스(fck-nat, t4g.nano)로 가자
 
-인그레스는 Traefik + NLB로 HTTP랑 수집기 gRPC를 한 문으로 받자 인증서는 cert-manager
+인그레스는 Traefik + NLB로 HTTP랑 Collector gRPC를 한 문으로 받자 인증서는 cert-manager
 
 Kafka랑 ClickHouse는 공식 이미지로 StatefulSet을 직접 만들고 EBS에 둔다 Bitnami는 무료 이미지 업데이트가 끊겨서 패스
 
