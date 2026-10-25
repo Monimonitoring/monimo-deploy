@@ -378,7 +378,7 @@ UI 는 Ingress 에 안 두고 port-forward 로만
 Application
 App of Apps 로
 argocd/root.yaml 을 사람이 한 번 넣으면 root 가 argocd/apps/local 폴더를 가리킨다
-그 폴더에 자식 Application 넷 (0-namespaces 1-infra 2-jobs 3-apps) 두고 각자 overlays/local/<단계> 을 가리키게
+그 폴더에 자식 Application 넷 (0-namespaces 1-infra 2-jobs 3-apps) 두고 각자 overlays/local/<단계> 를 가리키게
 자식 파일에 sync wave 0 1 2 3 붙여서 숫자 작은 거부터
 syncPolicy 는 비워서 manual sync 로 (자동은 EKS 에서 할 거)
 

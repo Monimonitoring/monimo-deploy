@@ -11,7 +11,7 @@
 #   0  네임스페이스 + 비밀값 · SQL · 인증서   local-prereqs.sh
 #   1  저장소 셋                  → Ready 까지
 #   2  준비 Job 셋                → 성공 종료까지
-#   3  Collector · Ingester        → Ready 까지
+#   3  Collector · Ingester       → Ready 까지
 #   4  telemetrygen               check-local.sh
 #
 # 값은 backend .env 와 같은 이름 · 같은 로컬 기본값을 환경변수로 받는다. 레포에는 Secret 이름만 있다 (AGENTS.md §2)

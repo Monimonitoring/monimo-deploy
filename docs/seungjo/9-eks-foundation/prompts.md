@@ -72,7 +72,7 @@ NAT 게이트웨이는 비싸니까 NAT 인스턴스(fck-nat, t4g.nano)로 가�
 
 Kafka랑 ClickHouse는 공식 이미지로 StatefulSet을 직접 만들고 EBS에 둔다 Bitnami는 무료 이미지 업데이트가 끊겨서 패스
 
-비밀값은 Secrets Manager에 두고 External Secrets Operator로 넣자
+비밀값은 Secrets Manager 에 두고 External Secrets Operator로 넣자
 
 이미지 태그는 CI가 ECR에 푸시하고 GitHub App 토큰으로 deploy 레포에 image.tag를 커밋하자 Image Updater는 도구가 하나 늘고 ADR이랑 달라서 패스
 
