@@ -48,7 +48,7 @@
 1. GitHub 이슈를 만든다. 제목은 커밋 형식과 같게.
 2. 브랜치를 판다. `feat/<이슈번호>-<설명>` · `fix/<이슈번호>-<설명>` · `chore/<설명>`. **`origin/develop` 에서 새로 판다.**
 3. 커밋 메시지는 `<타입>(<범위>): <요약>`. 타입은 feat · fix · docs · chore · refactor · test.
-4. PR 의 base 는 `develop`. `main` · `develop` 직접 push 는 막혀 있다.
+4. PR 의 base 는 `develop`. `main` · `develop` 직접 push 는 막혀 있다. **예외는 GitHub App `monimo-deploy-bot` 하나다**(2026-11-23, `#27`) : backend CI(`#279`)가 ECR 에 올린 커밋 SHA 를 `overlays/eks/3-apps` 의 이미지 줄 다섯에 적어 커밋한다. Argo CD 는 레지스트리가 아니라 Git 만 보므로 그 커밋이 배포 버튼이다. **사람은 예외가 아니다** : 예외 목록에 봇만 넣었고 리뷰 승인 수 등 나머지 보호 설정은 전과 같은 값이다
 
 ## 4. 담당
 
@@ -68,6 +68,7 @@
 - 2026-10-26 코드 안 문자열도 같은 이름으로 바꿨다 (backend `#241`) : 스크립트 출력(`step "3 Collector · Ingester"` · `4 E2E 확인`)
 - 2026-10-28 `docs/plan.md` 의 4 ~ 7단계 날짜를 다시 잡았다 : 옛 4단계 날짜(10/20~27)가 지났고 **중간발표(10/31) 로컬 시연 영상** 때문에 Terraform 을 그 뒤로 미뤘다. 4단계 11/1~6 · 5단계 11/7~12 · 6단계 11/13~18 · 7단계 11/19~22. 중간발표는 배포 단계가 아니라 표에 넣지 않고 머리에 적었다. **7단계 여유가 줄었다**(E2E · 안정화 사흘 + 촬영 하루) : 더 밀리면 6절의 데모 비상 대책으로 간다
 - 2026-11-23 `kafka-init` Job 이 만드는 토픽을 신호별 셋으로 바꿨다 (`#25` · backend `#281` · backend ADR `#74`) : `raw`(파티션 3 · 7일) 하나 → `raw.traces` · `raw.metrics` · `raw.logs`(각 파티션 1 · 7일), `raw.dlq`(파티션 1 · 30일)는 그대로. 브로커가 자동 생성을 꺼 둬서(`KAFKA_AUTO_CREATE_TOPICS_ENABLE=false`) 이 Job 이 안 만들면 그 토픽은 없고 발행이 바로 실패한다. 나눈 이유는 backend ADR `#74` : 실측 쏠림 26배 · 파티션 하나 영구 공백 · 설정 단위가 토픽이라 신호별 보관 · 파티션을 못 준다 · OTel 공식 Kafka receiver 는 토픽당 신호 1종만 읽는다. **`docs/seungjo/14-local-k8s-collect/research.md` 는 그날 기록이라 고치지 않았다**(그때는 토픽이 `raw` 하나였다)
+- 2026-11-23 `develop` 보호 규칙에 **봇 예외**를 넣었다 (`#27` · backend `#279`) : 넣기 전에는 backend CI 의 `deploy-tag` 가 `GH006: Protected branch update failed ... Changes must be made through a pull request` 로 세 번 다 거절됐다. 같은 날 그 CI 가 못 읽던 App 비밀 열쇠(`.pem` 이 붙여넣기로 깨져 `DECODER routines::unsupported`)도 파일째 다시 넣어 고쳤다. 두 벽을 넘은 뒤 첫 봇 커밋이 들어왔다 : `6a5966e chore(images): backend ddc9e21 이미지 다섯 (eks)`
 
 ## 6. 지금 막혀 있는 것
 
