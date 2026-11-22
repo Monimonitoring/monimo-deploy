@@ -10,16 +10,16 @@ resources:
 images:
 - name: monimo-local.invalid/api-server
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/api-server
-  newTag: ddc9e21e1cae2f60381f5e6fa9aba68c162d93bd
+  newTag: 79c5df3619a54073b00ce7cf613c5556bf9c7fb6
 - name: monimo-local.invalid/collector
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/collector
-  newTag: ddc9e21e1cae2f60381f5e6fa9aba68c162d93bd
+  newTag: 79c5df3619a54073b00ce7cf613c5556bf9c7fb6
 - name: monimo-local.invalid/detector
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/detector
-  newTag: ddc9e21e1cae2f60381f5e6fa9aba68c162d93bd
+  newTag: 79c5df3619a54073b00ce7cf613c5556bf9c7fb6
 - name: monimo-local.invalid/ingester
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/ingester
-  newTag: ddc9e21e1cae2f60381f5e6fa9aba68c162d93bd
+  newTag: 79c5df3619a54073b00ce7cf613c5556bf9c7fb6
 - name: monimo-local.invalid/notifier
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/notifier
-  newTag: ddc9e21e1cae2f60381f5e6fa9aba68c162d93bd
+  newTag: 79c5df3619a54073b00ce7cf613c5556bf9c7fb6
