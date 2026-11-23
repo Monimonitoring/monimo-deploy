@@ -1,0 +1,14 @@
+# 로컬 자식 Application 셋을 그대로 쓰고 앱 경로 하나만 ECR overlay 로 바꾼다 (up-argocd.sh --ecr 의 root 가 여기를 본다).
+# 준비 Job 셋(overlays/local/2-jobs)은 그대로 로컬 빌드 이미지다 : 마이그레이션 이미지는 아직 ECR 에 없다 (backend AGENTS.md §6)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../local
+patches:
+  - target:
+      kind: Application
+      name: local-apps
+    patch: |-
+      - op: replace
+        path: /spec/sources/1/path
+        value: overlays/local-ecr/3-apps

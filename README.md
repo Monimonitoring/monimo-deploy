@@ -23,7 +23,7 @@
 
 ## 로컬 실행 (Docker Desktop 쿠버네티스)
 
-Collector → Kafka → Ingester → ClickHouse 한 줄을 로컬 쿠버네티스에 올리고, 가짜 신호(`telemetrygen`)로 E2E 까지 확인한다.
+Collector → Kafka → Ingester → ClickHouse 한 줄과 경보 쪽(API server · Detector · Notifier)을 로컬 쿠버네티스에 올리고, 가짜 신호(`telemetrygen`)로 수집 E2E 까지 확인한다.
 
 **처음 한 번**
 
@@ -31,13 +31,14 @@ Collector → Kafka → Ingester → ClickHouse 한 줄을 로컬 쿠버네티�
 2. backend 레포를 이 레포 옆(`../monimo-backend`)에 두고 이미지를 만든다. 쿠버네티스는 이 로컬 이미지를 그대로 쓴다(레지스트리 없음)
    ```bash
    cd ../monimo-backend
-   docker compose --profile collector --profile ingester build   # collector · ingester · clickhouse-migrate · otlp-certs
+   docker compose --profile collector --profile ingester --profile api-server --profile detector --profile notifier build
+   # collector · ingester · api-server · detector · notifier · clickhouse-migrate · otlp-certs
    ```
 
 **올리기 · 지우기**
 
 ```bash
-./scripts/up-local.sh          # 0 네임스페이스 · 비밀값 → 1 저장소 셋 → 2 준비 Job 셋 → 3 앱 둘 → 4 E2E 확인
+./scripts/up-local.sh          # 0 네임스페이스 · 비밀값 → 1 저장소 셋 → 2 준비 Job 셋 → 3 앱 다섯 → 4 E2E 확인
 ./scripts/up-local.sh --down   # 네임스페이스 셋을 지운다 (로컬 볼륨도 같이 지워진다)
 ```
 
@@ -56,6 +57,7 @@ Collector → Kafka → Ingester → ClickHouse 한 줄을 로컬 쿠버네티�
 ```bash
 kubectl -n apm rollout restart deployment/collector
 kubectl -n apm rollout restart deployment/ingester
+kubectl -n apm rollout restart deployment/api-server deployment/detector deployment/notifier
 ```
 
 **들여다보기**
@@ -64,6 +66,7 @@ kubectl -n apm rollout restart deployment/ingester
 kubectl -n data get pods,jobs,pvc
 kubectl -n apm logs deploy/collector
 kubectl -n apm port-forward svc/collector 4317:4317 18081:18081   # 내 컴퓨터에서 localhost:4317 · /actuator 로 닿기
+kubectl -n apm port-forward svc/api-server 8080:8080              # 경보 규칙 · 채널 API (http://localhost:8080/api/v1). ArgoCD 화면과 같은 8080 이라 둘을 같이 열 때는 한쪽 번호를 바꾼다
 ```
 
 **에이전트 mTLS 켜 보기** (로컬 실험, 커밋하지 않는다, `up-local.sh` 길) : 인증서 Secret 은 늘 들어가 있어서 Collector 환경변수 하나만 바꾸면 된다. base(`apps/`)는 EKS 와 같이 쓰므로 고치지 않는다
@@ -72,7 +75,7 @@ kubectl -n apm port-forward svc/collector 4317:4317 18081:18081   # 내 컴퓨�
 kubectl -n apm set env deployment/collector MONIMO_COLLECTOR_OTLP_GRPC_TLS_CLIENT_AUTH=optional
 ```
 
-- `require` 로 올리면 평문으로 보내는 것이 전부 끊긴다 : `checks/telemetrygen` 과 **Collector · Ingester 자신의 에이전트**(자기 감시)
+- `require` 로 올리면 평문으로 보내는 것이 전부 끊긴다 : `checks/telemetrygen` 과 **우리 앱 다섯 자신의 에이전트**(자기 감시)
 - 서버 인증서 이름은 `collector` · `localhost` 뿐이다 : 같은 `apm` 네임스페이스에서 `collector:4317` 로 부르면 맞고, 다른 네임스페이스에서 `collector.apm.svc.cluster.local` 로 부르면 이름 검사에서 끊긴다
 - 되돌리기 : `./scripts/up-local.sh` 를 다시 치면 매니페스트 값(`none`)으로 돌아간다
 
@@ -133,6 +136,9 @@ Phase 1a compose(`compose/`)용 (`.env.example` 참고). 1b 이후 EKS 비밀값
 |---|---|---|
 | Collector | `collector.apm.svc.cluster.local` | 4317 OTLP gRPC · 8081 업무(`/livez` · `/readyz`) · 18081 관리(`/actuator`) |
 | Ingester | `ingester.apm.svc.cluster.local` | 8082 업무 · 18082 관리 |
+| API server | `api-server.apm.svc.cluster.local` | 8080 업무(`/api/v1` · `/livez` · `/readyz`) · 18080 관리 |
+| Detector | `detector.apm.svc.cluster.local` | 8083 업무 · 18083 관리 |
+| Notifier | `notifier.apm.svc.cluster.local` | 8084 업무 · 18084 관리 |
 | Kafka | `kafka-0.kafka.data.svc.cluster.local` | 29092 |
 | ClickHouse | `clickhouse.data.svc.cluster.local` | 8123 HTTP · 9000 native |
 | PostgreSQL | `postgres.data.svc.cluster.local` | 5432 |

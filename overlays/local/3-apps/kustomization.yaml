@@ -3,6 +3,9 @@ kind: Kustomization
 resources:
   - ../../../apps/collector
   - ../../../apps/ingester
+  - ../../../apps/api-server
+  - ../../../apps/detector
+  - ../../../apps/notifier
 # 로컬 빌드 태그. 같은 태그로 다시 빌드하면 파드가 안 바뀐다 : kubectl -n apm rollout restart deployment/<이름>
 images:
   - name: monimo-local.invalid/collector
@@ -10,4 +13,13 @@ images:
     newTag: dev
   - name: monimo-local.invalid/ingester
     newName: monimo/ingester
+    newTag: dev
+  - name: monimo-local.invalid/api-server
+    newName: monimo/api-server
+    newTag: dev
+  - name: monimo-local.invalid/detector
+    newName: monimo/detector
+    newTag: dev
+  - name: monimo-local.invalid/notifier
+    newName: monimo/notifier
     newTag: dev

@@ -1,0 +1,20 @@
+# 로컬 ArgoCD 가 ECR 이미지로 앱 다섯을 띄우는 길 (배포 5단계 확인용, up-argocd.sh --ecr)
+#
+# 이미지 줄은 따로 적지 않고 CI 봇이 커밋하는 overlays/eks/3-apps 를 그대로 가져온다 (ADR #62 H) :
+# 백엔드 커밋 SHA → ECR 태그 → eks overlay 의 images 줄 → 이 overlay → 파드 이미지가 한 줄로 이어진다.
+# eks overlay 에 EKS 전용 값(nodeSelector · Spot 등)이 들어오면 여기서 지우는 패치를 더한다
+#
+# ECR 은 비공개라 노드가 이미지를 받을 때 로그인 토큰이 필요하다. 토큰(12시간 만료)은 레포에 두지 않고
+# scripts/ecr-pull-secret.sh 가 apm 네임스페이스에 Secret ecr-pull 로 넣는다. 만료돼도 떠 있는 파드는 그대로고 새로 받을 때만 막힌다
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../eks/3-apps
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ecr-pull
