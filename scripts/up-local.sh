@@ -11,7 +11,7 @@
 #   0  네임스페이스 + 비밀값 · SQL · 인증서   local-prereqs.sh
 #   1  저장소 셋                  → Ready 까지
 #   2  준비 Job 셋                → 성공 종료까지
-#   3  Collector · Ingester       → Ready 까지
+#   3  Collector · Ingester · API server · Detector · Notifier → Ready 까지
 #   4  telemetrygen               check-local.sh
 #
 # 값은 backend .env 와 같은 이름 · 같은 로컬 기본값을 환경변수로 받는다. 레포에는 Secret 이름만 있다 (AGENTS.md §2)
@@ -47,11 +47,11 @@ k apply -k "$ROOT/overlays/local/2-jobs" > /dev/null
 for j in kafka-init postgres-migrate clickhouse-migrate; do wait_job data "$j"; done
 
 # ── 3
-step "3 Collector · Ingester"
+step "3 Collector · Ingester · API server · Detector · Notifier"
 k apply -k "$ROOT/overlays/local/3-apps" > /dev/null
-for d in collector ingester; do wait_rollout apm "deployment/$d"; done
+for d in collector ingester api-server detector notifier; do wait_rollout apm "deployment/$d"; done
 # readiness 가 이미 /readyz 를 봤지만, 완료 조건(업무 포트 /readyz 200)을 눈에 보이게 한 번 더 찌른다
-for pair in collector:8081 ingester:8082; do
+for pair in collector:8081 ingester:8082 api-server:8080 detector:8083 notifier:8084; do
   name=${pair%%:*}; port=${pair##*:}
   code=$(k -n apm exec "deploy/$name" -- bash -c \
     "exec 3<>/dev/tcp/127.0.0.1/$port; printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3; head -1 <&3" | awk '{print $2}') || code="exec 실패"

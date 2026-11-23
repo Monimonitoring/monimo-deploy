@@ -35,11 +35,12 @@ require_local_context
 step "준비"
 k get nodes > /dev/null 2>&1 || fail "클러스터에 닿지 않는다 (Docker Desktop 설정 → Kubernetes 켜기)"
 ok "클러스터 $CONTEXT"
-for image in monimo/collector:dev monimo/ingester:dev monimo/clickhouse-migrate:dev monimo/otlp-certs:dev; do
+for image in monimo/collector:dev monimo/ingester:dev monimo/api-server:dev monimo/detector:dev monimo/notifier:dev \
+             monimo/clickhouse-migrate:dev monimo/otlp-certs:dev; do
   docker image inspect "$image" > /dev/null 2>&1 \
-    || fail "이미지 $image 가 없다. backend 에서 docker compose --profile collector --profile ingester build 로 만든다"
+    || fail "이미지 $image 가 없다. backend 에서 docker compose --profile collector --profile ingester --profile api-server --profile detector --profile notifier build 로 만든다"
 done
-ok "로컬 이미지 넷 (monimo/*:dev)"
+ok "로컬 이미지 일곱 (monimo/*:dev)"
 [ -d "$BACKEND_DIR/db/postgres" ] && [ -d "$BACKEND_DIR/db/clickhouse" ] \
   || fail "backend 레포를 못 찾았다 : $BACKEND_DIR (BACKEND_DIR=... 로 알려 준다)"
 ok "backend 레포 $BACKEND_DIR"

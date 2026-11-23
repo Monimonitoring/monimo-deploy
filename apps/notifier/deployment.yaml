@@ -1,0 +1,72 @@
+# Notifier. Detector 가 PG outbox 에 넣은 발송 작업을 꺼내 Slack 등 채널로 보낸다. 환경변수는 backend compose.yaml 의 notifier 를 옮겼다
+# 포트 : 8084 업무(/livez · /readyz) · 18084 관리(/actuator/**, 업무 포트 + 10000, ADR #61)
+#
+# Slack 주소(Webhook)는 여기 없다 : 채널은 API server 의 경보 채널 API 로 등록하고 PG 에 들어간다. 그래서 이 파드에 걸 비밀값은 PG 계정 · 내부 토큰뿐이다
+# 밖으로 나가는 길(Slack)이 필요하다 : 로컬은 Docker Desktop 이 그대로 내보내고, EKS 는 NAT 인스턴스로 나간다 (ADR #62 ④)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifier
+  labels:
+    app.kubernetes.io/name: notifier
+    app.kubernetes.io/part-of: monimo-apm
+spec:
+  # 한 대. 발송 작업은 PG 에서 선점(lease)해서 꺼내므로 배포 중 두 대가 겹쳐도 같은 작업을 같이 잡지 않는다
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notifier
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notifier
+        app.kubernetes.io/part-of: monimo-apm
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: notifier
+          # base 이름은 일부러 어디서도 못 받는 주소다 : overlay 가 이미지 줄을 안 채우면 Docker Hub 의 남의 monimo/ 를 당기지 않고 바로 실패한다
+          image: monimo-local.invalid/notifier
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8084
+            - name: management
+              containerPort: 18084
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+            - name: SPRING_PROFILES_ACTIVE
+              value: local
+            - name: POSTGRES_HOST
+              value: postgres.data.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_PASSWORD }
+            - name: MONIMO_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: monimo-tokens, key: MONIMO_INTERNAL_TOKEN }
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.instance.id=$(POD_NAME),deployment.environment.name=local
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_SQL
+              value: info
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND
+              value: info
+            - name: LOGGING_LEVEL_COM_MONIMO_NOTIFIER
+              value: info
+          startupProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5

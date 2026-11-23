@@ -1,0 +1,18 @@
+# 클러스터 안 주소 notifier.apm.svc.cluster.local. API server 가 업무 포트(8084 : 채널 시험 발송)와 관리 포트(18084 : 상태)를 부른다
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifier
+  labels:
+    app.kubernetes.io/name: notifier
+    app.kubernetes.io/part-of: monimo-apm
+spec:
+  selector:
+    app.kubernetes.io/name: notifier
+  ports:
+    - name: http
+      port: 8084
+      targetPort: http
+    - name: management
+      port: 18084
+      targetPort: management

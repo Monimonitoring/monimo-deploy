@@ -1,0 +1,18 @@
+# 클러스터 안 주소 detector.apm.svc.cluster.local. 업무 포트로 부르는 쪽은 없고, API server 가 관리 포트(18083)로 상태를 읽는다
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector
+  labels:
+    app.kubernetes.io/name: detector
+    app.kubernetes.io/part-of: monimo-apm
+spec:
+  selector:
+    app.kubernetes.io/name: detector
+  ports:
+    - name: http
+      port: 8083
+      targetPort: http
+    - name: management
+      port: 18083
+      targetPort: management

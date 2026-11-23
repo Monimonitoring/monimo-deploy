@@ -1,0 +1,93 @@
+# API server. 상태가 없어 Deployment. 환경변수는 backend compose.yaml 의 api-server 를 옮기고 주소만 바꿨다
+# 포트 : 8080 업무(/api/v1 · /livez · /readyz) · 18080 관리(/actuator/**, 업무 포트 + 10000, ADR #61)
+# 경보 쪽에서 이 서비스가 필요한 이유 둘 : Detector 가 평가할 값을 여기(질의 파사드)로 읽고, 경보 규칙 · Slack 채널을 여기 API 로 등록한다
+# readiness 는 업무 포트의 /readyz 이고 저장소를 안 본다 (ADR #58)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app.kubernetes.io/name: api-server
+    app.kubernetes.io/part-of: monimo-apm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-server
+        app.kubernetes.io/part-of: monimo-apm
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: api-server
+          # base 이름은 일부러 어디서도 못 받는 주소다 : overlay 가 이미지 줄을 안 채우면 Docker Hub 의 남의 monimo/ 를 당기지 않고 바로 실패한다
+          image: monimo-local.invalid/api-server
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 18080
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+            - name: SPRING_PROFILES_ACTIVE
+              value: local
+            - name: POSTGRES_HOST
+              value: postgres.data.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_PASSWORD }
+            - name: CLICKHOUSE_HOST
+              value: clickhouse.data.svc.cluster.local
+            - name: CLICKHOUSE_HTTP_PORT
+              value: "8123"
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: CLICKHOUSE_USER }
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: CLICKHOUSE_PASSWORD }
+            # 같은 네임스페이스(apm)라 Service 이름만 쓴다. compose 와 같은 글자라 에이전트가 그리는 Service map 간선 이름도 같다
+            - name: MONIMO_COLLECTOR_URLS
+              value: http://collector:8081
+            - name: MONIMO_NOTIFIER_URL
+              value: http://notifier:8084
+            - name: MONIMO_DETECTOR_MANAGEMENT_URL
+              value: http://detector:18083
+            - name: MONIMO_COLLECTOR_MANAGEMENT_URL
+              value: http://collector:18081
+            - name: MONIMO_NOTIFIER_MANAGEMENT_URL
+              value: http://notifier:18084
+            - name: MONIMO_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: monimo-tokens, key: MONIMO_INTERNAL_TOKEN }
+            # 이름표는 파드 이름 그대로 (monimo-shop #30)
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.instance.id=$(POD_NAME),deployment.environment.name=local
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_SQL
+              value: info
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND
+              value: info
+            - name: LOGGING_LEVEL_COM_MONIMO_API
+              value: info
+          # 기동이 20~60초라 startup 이 끝나야 liveness 를 본다
+          startupProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5

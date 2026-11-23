@@ -1,0 +1,80 @@
+# Detector. 경보 규칙을 주기적으로 평가해 사건(alert_events)과 발송 작업(outbox)을 PG 에 쓴다. 환경변수는 backend compose.yaml 의 detector 를 옮겼다
+# 포트 : 8083 업무(/livez · /readyz) · 18083 관리(/actuator/**, 업무 포트 + 10000, ADR #61)
+#
+# 평가 값은 Kafka 가 아니라 API server(질의 파사드)로 읽는다 (팀 규칙 : Kafka 가 죽으면 경보도 죽으면 안 된다).
+# compose 는 api-server 가 healthy 일 때 띄웠지만 쿠버네티스에는 그 순서가 없다. 먼저 떠도 괜찮다 :
+# readiness 가 api-server 를 안 보고(ADR #58), 평가 한 번이 실패하면 그 주기를 판정 불가로 넘기고 다음 주기에 다시 읽는다
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector
+  labels:
+    app.kubernetes.io/name: detector
+    app.kubernetes.io/part-of: monimo-apm
+spec:
+  # 한 대. 배포 중 잠깐 두 대가 겹쳐도 사건이 두 번 생기지 않는다 : 평가 상태 줄을 FOR UPDATE 로 잠그고
+  # 이미 반영한 1분 버킷은 DUPLICATE_BUCKET 으로 건너뛴다 (backend EvaluationRecorder · AlertStateMachine). 겹치는 동안 조회만 두 번 나간다
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: detector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: detector
+        app.kubernetes.io/part-of: monimo-apm
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: detector
+          # base 이름은 일부러 어디서도 못 받는 주소다 : overlay 가 이미지 줄을 안 채우면 Docker Hub 의 남의 monimo/ 를 당기지 않고 바로 실패한다
+          image: monimo-local.invalid/detector
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8083
+            - name: management
+              containerPort: 18083
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+            - name: SPRING_PROFILES_ACTIVE
+              value: local
+            - name: POSTGRES_HOST
+              value: postgres.data.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: monimo-db, key: POSTGRES_PASSWORD }
+            # 평가가 읽는 API server 내부 문. FQDN 이 아니라 짧은 이름으로 둔다 : 아래 이름 짝의 왼쪽(호스트 글자)과 같아야 한다
+            - name: MONIMO_API_SERVER_URL
+              value: http://api-server:8080
+            # Service map 에서 detector → api-server 를 "우리 서비스" 로 잇는다 (backend #259 문제 ④). 호스트 글자가 정확히 같아야 짝이 맞는다
+            - name: OTEL_INSTRUMENTATION_COMMON_PEER_SERVICE_MAPPING
+              value: api-server=monimo-api-server
+            - name: MONIMO_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef: { name: monimo-tokens, key: MONIMO_INTERNAL_TOKEN }
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.instance.id=$(POD_NAME),deployment.environment.name=local
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_SQL
+              value: info
+            - name: LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND
+              value: info
+            - name: LOGGING_LEVEL_COM_MONIMO_DETECTOR
+              value: info
+          startupProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5

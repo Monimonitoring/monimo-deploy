@@ -1,4 +1,4 @@
-# 번호 3 : 준비 Job 셋 + Collector · Ingester (up-local.sh 의 2 · 3)
+# 번호 3 : 준비 Job 셋 + Collector · Ingester · API server · Detector · Notifier (up-local.sh 의 2 · 3)
 # 준비 Job 셋은 PreSync hook 이다 : 이 자식이 sync 할 때 Job 이 먼저 돌고, 셋 다 성공해야 앱을 넣는다 (표 · 토픽 없이 앱이 뜨면 꺼진다)
 # Job 만 든 자식(2-jobs)을 따로 두면 안 됐다 (2026-10-19 실측, research.md 9절) : hook 은 「평소 자원」이 아니라서
 # Job 만 있는 자식은 처음부터 Synced 로 보이고, automated 는 OutOfSync 일 때만 sync 하므로 Job 이 한 번도 안 돈다

@@ -7,6 +7,9 @@ kind: Kustomization
 resources:
 - ../../../apps/collector
 - ../../../apps/ingester
+- ../../../apps/api-server
+- ../../../apps/detector
+- ../../../apps/notifier
 images:
 - name: monimo-local.invalid/api-server
   newName: 218549829575.dkr.ecr.ap-northeast-2.amazonaws.com/monimo/api-server
