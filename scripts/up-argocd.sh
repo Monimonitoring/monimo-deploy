@@ -2,7 +2,6 @@
 # 로컬 쿠버네티스(Docker Desktop)에 ArgoCD 를 띄우고 root Application 을 넣는다 (#20). kubectl 로 단계를 넣는 up-local.sh 와 다른 길이다
 #
 #   ./scripts/up-argocd.sh           레포 밖 준비물(local-prereqs.sh) → ArgoCD 설치 → root 넣기 → UI 들어가는 법 출력
-#   ./scripts/up-argocd.sh --ecr     같은 길인데 앱 다섯을 ECR 이미지(CI 가 커밋한 SHA 태그)로 띄운다 : root 가 argocd/apps/local-ecr 를 보고, ECR 받기 토큰을 넣는다
 #   ./scripts/up-argocd.sh --down    지우기 (argocd · apm · data · shop 네임스페이스, PVC 도 같이 지워진다. CRD 같은 클러스터 단위 자원은 남는다)
 #
 # 순서는 이 스크립트가 아니라 sync wave 가 지킨다 (argocd/apps/local 의 번호표 0 → 3). 이 스크립트는 root 를 sync 하지 않는다 :
@@ -11,8 +10,8 @@ set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
 case "${1:-}" in
-  ""|--down|--ecr) ;;
-  *) echo "✗ 모르는 인자 $1 (쓸 수 있는 것 : 없음 · --ecr · --down)"; exit 1 ;;
+  ""|--down) ;;
+  *) echo "✗ 모르는 인자 $1 (쓸 수 있는 것 : 없음 · --down)"; exit 1 ;;
 esac
 
 require_local_context
@@ -40,12 +39,7 @@ wait_rollout argocd statefulset/argocd-application-controller
 # ── 3
 step "3 root Application"
 k apply -f "$ROOT/argocd/root.yaml" > /dev/null
-if [ "${1:-}" = --ecr ]; then
-  # root 는 수동 sync 라 이 경로 바꾸기가 다음 apply 전까지 유지된다. 되돌리려면 --ecr 없이 다시 친다
-  k -n argocd patch application root --type merge -p '{"spec":{"source":{"path":"argocd/apps/local-ecr"}}}' > /dev/null
-  "$ROOT/scripts/ecr-pull-secret.sh"
-fi
-ok "root → $(k -n argocd get application root -o jsonpath='{.spec.source.path}') ($(k -n argocd get application root -o jsonpath='{.spec.source.targetRevision}'))"
+ok "root → argocd/apps/local ($(k -n argocd get application root -o jsonpath='{.spec.source.targetRevision}'))"
 
 cat <<'MSG'
 
